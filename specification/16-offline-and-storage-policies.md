@@ -32,7 +32,7 @@ Cascade rules:
 
 Behavior of a **kept** file: proactively downloaded, decrypted, **indexed for search** ([11](11-search.md)), and available fully offline. It remains encrypted at rest; "keep on device" controls *availability*, not whether it's encrypted.
 
-This is a **per-device** choice (each of the user's devices keeps its own selection). It maps onto the server sync policy ([08 §8.2](08-sync-engine.md)): kept ⇒ treated as `pinned-local` on this device; not-kept ⇒ `server-default` (fetched on demand). The separate **`excluded`** choice ("device-only, never upload to the server") remains available per file for content the user never wants to leave the device. *(Open item: confirm whether the server's `sync_policy` is per-device or shared across a user's devices; if shared, this per-device selection is tracked client-side — [19 §19.5](19-open-questions.md).)*
+This is a **client-local, per-device** choice (each of the user's devices keeps its own selection) and is **never sent to the server**. It is *not* a server sync policy: every kept and not-kept file is `server-default` server-side ([08 §8.2](08-sync-engine.md)) — kept just means this device proactively downloads, decrypts, and indexes it; not-kept means fetch-on-open. The separate server **`excluded`** choice ("device-only, never upload to the server") remains available per file for content the user never wants to leave the device. (`pinned-local` is **not** a sync policy — offline pinning is exactly this `keepOnDevice` field; see [19 §19.5](19-open-questions.md).)
 
 Persisted as a `keepOnDevice` setting on files and an inherited default on folders/projects ([04 §4.2](04-local-data-model.md)).
 
@@ -40,7 +40,7 @@ Persisted as a `keepOnDevice` setting on files and an inherited default on folde
 
 - Files that are **not** kept-on-device are fetched and decrypted **on open**, then discarded when closed — nothing accumulates silently.
 - An optional **convenience cache** (default **on**, user-toggleable, with a small optional size cap) may retain *recently opened* not-kept files so reopening is instant. It is purely an optimization: evicting an item only means it's re-downloaded next time (the server always holds the full encrypted copy). It is **never** used for kept files (those are guaranteed) and never holds `excluded` content.
-- On eviction of a not-kept file's plaintext, drop its FTS **body** but keep its **title** so it stays discoverable; reopening re-indexes it ([11 §11.3](11-search.md)).
+- On eviction of a not-kept file's plaintext, drop its FTS **body** but keep its **title** so it stays discoverable; reopening re-indexes it ([11 §11.3](11-search.md)). Consequently the **FTS body set = kept files + files currently in the convenience cache**; **disabling the convenience cache evicts all not-kept bodies from FTS** (titles/metadata of all known files remain indexed) ([11 §11.1](11-search.md)).
 - A **Storage settings** screen shows usage (kept vs. convenience cache vs. index), lets the user toggle/limit or clear the convenience cache, and surfaces keep-on-device toggles at file/folder/project level.
 
 ## 16.4 Battery & network constraints

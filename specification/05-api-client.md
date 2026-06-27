@@ -5,8 +5,10 @@ Implements the server REST surface ([server 04](https://github.com/Nyxite/server
 ## 5.1 Configuration
 
 - **Base URL**: `https://{host}/api/v1` — configurable (the instance host; default `nyxite.app`). The OIDC authority, API base, and public-share base are all configurable at build/runtime ([14](14-authentication.md)).
-- **Auth**: `Authorization: Bearer <OIDC access token>` on all `/api/v1/**` except public share endpoints. Guests use a short-lived **share token** ([14](14-authentication.md)).
-- **IDs** UUIDv7; **timestamps** RFC 3339 UTC; **pagination** cursor-based; **idempotency** via `Idempotency-Key` on creates.
+- **Auth**: `Authorization: Bearer <OIDC access token>` on all `/api/v1/**` except public share endpoints. Guests use a short-lived **share token** ([14](14-authentication.md)). **Token lifetimes** (match server): access token ~5 min; guest share-session token 15 min (renewable); relay socket ticket single-use, 60 s.
+- **IDs** UUIDv7; **timestamps** RFC 3339 UTC.
+- **Pagination**: cursor-based — `?cursor=<opaque>&limit=<n>` (default `50`, max `200`); responses are `{ items, nextCursor }`. The cursor is an **opaque base64url** token, persisted as-is (`SyncCursorEntity.cursor`) and **never parsed** by the client.
+- **Idempotency**: `Idempotency-Key` on POST creates; keys are **(user, endpoint)-scoped for 24 h**. A replay with the same key returns the original response; a mismatched body with the same key returns `409 idempotency_conflict`.
 - **TLS**: standard validation against the public chain (Cloudflare-fronted `nyxite.app`). Optional **certificate/public-key pinning** via OkHttp `CertificatePinner`, configurable, with a documented rotation procedure ([17](17-security.md)). For admin/origin-direct hosts using the Cloudflare Origin CA, the configured host may require installing that CA — out of scope for normal users.
 
 ## 5.2 OkHttp/Retrofit setup
@@ -16,7 +18,7 @@ Implements the server REST surface ([server 04](https://github.com/Nyxite/server
   2. **IdempotencyInterceptor** — attach `Idempotency-Key` for create calls from the outbox.
   3. **ProblemJsonInterceptor** — parse `application/problem+json` into typed errors.
   4. **RetryInterceptor** — backoff on `429`/`5xx` honoring `Retry-After`.
-  5. (debug) logging interceptor with **strict redaction** of bodies (never log ciphertext sizes? sizes are fine; never log tokens/fragments) ([17](17-security.md)).
+  5. (debug) logging interceptor with **strict redaction** of bodies: ciphertext sizes and opaque IDs are not sensitive and may be logged; **never log plaintext, keys, tokens, or fragments** ([17](17-security.md)).
 - Retrofit with a kotlinx.serialization converter for JSON and a raw `RequestBody`/`ResponseBody` path for ciphertext streams.
 - **OpenAPI** at `/openapi/v1.json` is the contract; generate or hand-write the typed API and verify against it in CI ([18](18-build-ci-testing.md)).
 
@@ -29,7 +31,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET /projects/{id}/folders`
 - `POST/GET/PATCH/DELETE /folders`, `/folders/{id}` *(json, `nameEnc`,`parentFolderId`)*
 - `GET /folders/{id}/files`
-- `POST/GET/PATCH/DELETE /files`, `/files/{id}` *(json: `nameEnc`,`contentType`,`syncPolicy`)*
+- `POST/GET/PATCH/DELETE /files`, `/files/{id}` *(json: `nameEnc`,`contentType`,`syncPolicy`,`crdtDocId`)* — `POST` includes the client-allocated `crdtDocId` (UUIDv7; required for text types, null otherwise). `contentType` is **immutable**: the client never `PATCH`es it. `syncPolicy` is the two-value enum `server-default`|`excluded` only.
 
 ### FileContentApi
 - `GET /files/{id}/blob` *(ciphertext stream; supports `If-None-Match: <contentHash>`)*
@@ -46,19 +48,20 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 ### KeysDevicesRecoveryApi
 - `GET /keys/directory?userId=` | `?email=` *(public keys)*
 - `PUT /keys` *(publish/rotate own public identity keys)*
-- `GET/POST/DELETE /devices`, `/devices/{id}`
-- `POST /devices/{id}/approve`
+- `GET/POST/DELETE /devices`, `/devices/{id}` — `POST /devices { label, pubkey }` → `{ deviceId, status: "pending", pairingCode, qrPayload }` (QR primary + 6–8 digit numeric code fallback, [07 §7.3](07-key-and-device-management.md))
+- `POST /devices/{id}/approve { wrappedIdentityKey }` — approving device sends `wrappedIdentityKey = HPKE-seal(newDevicePubkey, identity bundle)`
+- `GET /devices/me/enrollment` → `{ wrappedIdentityKey }` once approved — **single-use**; the server deletes the blob after this fetch
 - `GET/PUT /recovery` *(server-opaque escrow blob + `kdf_params`)*
 
 ### VersionsApi
 - `GET /files/{id}/versions` *(paginated, newest first)*
 - `GET /files/{id}/versions/{seq}` *(metadata)*
 - `GET /files/{id}/versions/{seq}/blob` *(ciphertext)*
-- `POST /files/{id}/restore` *(new head derived from version n)*
+- `POST /files/{id}/restore` *(body `{ seq }` only; new head derived from version `seq`, [12 §12.4](12-version-history.md))*
 
 ### SharesApi
-- `GET /shares?target=files/{id}`
-- `POST /shares` *(account: wrapped keys; link: `linkTokenHash` only)*
+- `GET /shares?targetType={file|folder|project}&targetId={id}`
+- `POST /shares { targetType, targetId, kind, ... }` *(account: wrapped keys; link: `linkTokenHash` only)*
 - `PATCH /shares/{id}` *(permission/expiry)*
 - `DELETE /shares/{id}` *(revoke; client rotates key separately)*
 
@@ -91,6 +94,7 @@ Parse RFC 9457 `problem+json` `code` into `sealed interface NyxiteApiError` and 
 | 409 `conflict`,`version_conflict` | `Conflict` | LWW reconcile ([08 §8.5](08-sync-engine.md)). |
 | 409 `excluded_content` | `ExcludedRejected` | Never retry upload of excluded files. |
 | 409 `address_exists` | `AddressExists` | Treat as success (write-once idempotent). |
+| 409 `idempotency_conflict` | `IdempotencyConflict` | Same `Idempotency-Key` reused with a different body; surface as a bug, do not retry. |
 | 410 `share_revoked`,`link_expired` | `ShareDead` | Mark share/link dead ([13](13-sharing.md)). |
 | 412 `key_generation_stale` | `KeyGenerationStale` | Refetch keys, re-encrypt with current gen, retry ([07](07-key-and-device-management.md)). |
 | 413 `payload_too_large` | `TooLarge` | Chunk (Phase 5) or reject. |
@@ -99,7 +103,7 @@ Parse RFC 9457 `problem+json` `code` into `sealed interface NyxiteApiError` and 
 
 ## 5.5 Reliability: outbox + idempotency
 
-- All mutating operations go through the **outbox** (`PendingOpEntity`, [04 §4.2](04-local-data-model.md)). Each create carries a stable client-generated `Idempotency-Key`; safe to retry after crashes/network loss.
+- All mutating operations go through the **outbox** (`PendingOpEntity`, [04 §4.2](04-local-data-model.md)). Each create carries a stable client-generated `Idempotency-Key` (24h, (user,endpoint)-scoped server-side); safe to retry after crashes/network loss — a replay returns the original response, while a mismatched body under the same key is rejected `409 idempotency_conflict`.
 - **Content addressing** makes blob/snapshot writes idempotent: re-`PUT` of the same address returns `address_exists` → treated as success.
 - Conditional GET (`If-None-Match: contentHash`) avoids re-downloading unchanged ciphertext.
 - Workers drain the outbox with exponential backoff + jitter, honoring `Retry-After` ([08](08-sync-engine.md)).

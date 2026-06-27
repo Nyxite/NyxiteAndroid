@@ -50,7 +50,7 @@ Client → server hub methods:
 
 ## 9.6 Snapshotting & compaction (client-driven)
 
-The server can't compact an encrypted log. **The client periodically snapshots**: serialize the merged Yrs doc, `seal` it with the FK, upload as a content-addressed blob + create a `file_versions` row ([12](12-version-history.md)). Triggers (`[P]`): N local updates, a time threshold, or graceful leave. Run in `SnapshotWorker`; any participant may snapshot; the server may then prune updates older than the snapshot's `seq` (keeping enough for in-flight clients).
+The server can't compact an encrypted log. **The client periodically snapshots**: serialize the merged Yrs doc, `seal` it with the FK, upload as a content-addressed blob + create a `file_versions` row ([12](12-version-history.md)). Triggers: **≥ 200 updates since the last snapshot**, **a 5-minute time threshold**, or the **last participant leaving** the room. Run in `SnapshotWorker`; any participant may snapshot; the server may then prune updates older than the snapshot's `seq` (keeping enough for in-flight clients).
 
 ## 9.7 Awareness & presence
 
@@ -65,6 +65,7 @@ The server can't compact an encrypted log. **The client periodically snapshots**
 - The FK comes from the fragment; the client decrypts/edits exactly as a member would.
 - Read-only links: the client receives `OnUpdate`/`OnAwareness` but is rejected on `SubmitUpdate` — the editor enters view-only mode. Guest-authored updates store `author_id = null` server-side.
 - A guest has no Keycloak account; the app runs in a constrained "guest session" without the full key/device subsystem.
+- **Guest storage model**: a guest runs **without the per-account SQLCipher DB**. Guest content is held in an **ephemeral in-memory cache only** and is **never written to any account database or `noBackup` files**; decrypted views are transient and discarded when the guest session ends ([14 §14.5](14-authentication.md)).
 
 ## 9.9 Reconnection & lifecycle
 

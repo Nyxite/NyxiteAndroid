@@ -31,7 +31,7 @@ The server gives it: authenticated transport, durable ordered storage of ciphert
 
 v1.0.0 is the **complete E2EE Android client** spanning Phases 0–6 of the master roadmap, built in the same phase order as the server (see [20-roadmap.md](20-roadmap.md)). The key/device/recovery subsystem is foundational (Phase 0) and is never retrofitted later.
 
-Explicitly **in scope**: markdown + plaintext + ink editing, the three sync policies, encrypted relay collaboration with guests, account + link sharing, rotation-based revocation, version history with client diffs/restore, on-device search, Keycloak login with TOTP, device enrollment and recovery-key flows, on-device key storage in the Android Keystore/StrongBox, and **multiple accounts / instance switching** (per-account isolated storage and keys, [14 §14.7](14-authentication.md)).
+Explicitly **in scope**: markdown + plaintext + ink editing, the server sync policies (`server-default`/`excluded`) plus client-local keep-on-device, encrypted relay collaboration with guests, account + link sharing, rotation-based revocation, version history with client diffs/restore, on-device search, Keycloak login with TOTP, device enrollment and recovery-key flows, on-device key storage in the Android Keystore/StrongBox, and **multiple accounts / instance switching** (per-account isolated storage and keys, [14 §14.7](14-authentication.md)).
 
 Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 and the separate migration item): office-document and source-code content types, image attachments, chunked upload for very large binaries, key-transparency/safety-number verification, metadata-graph hiding, and Samsung Notes `.sdoc` import. These are noted where they touch the architecture so seams exist for them.
 
@@ -67,7 +67,7 @@ Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 an
 - **Content address** — BLAKE3-256 hash of the *plaintext*, used as the blob's storage key; computed on-device.
 - **Encrypted frame** — the on-the-wire/at-rest container: `magic(4)|version(1)|key_id(16)|nonce(12)|ciphertext|tag(16)` with AAD binding `file_id` + object kind ([06](06-cryptography.md)).
 - **Key generation** — integer that bumps on FK rotation; clients must use the current generation.
-- **Sync policy** — per-file `server-default` | `pinned-local` | `excluded`.
+- **Sync policy** — per-file server policy: `server-default` | `excluded`. (Offline pinning is the separate **client-local** `keepOnDevice` field, never sent to the server — [16 §16.2](16-offline-and-storage-policies.md).)
 - **CRDT / Yrs / ykt** — the Yjs-family CRDT; `ykt` is the Kotlin binding the client uses to merge text documents.
 
 ## 0.7 Phase map (Android)
@@ -75,7 +75,7 @@ Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 an
 | Phase | Android deliverable |
 |-------|---------------------|
 | 0 | App shell, Keycloak login + TOTP, device enrollment, identity keys in Keystore, recovery-key UX, structure browsing with encrypted names, local encrypted DB. |
-| 1 | Markdown + plaintext editing on the encrypted CRDT (single user offline-first), blob sync, the three sync policies, on-demand download, view/edit modes, on-device search. |
+| 1 | Markdown + plaintext editing on the encrypted CRDT (single user offline-first), blob sync, server sync policies (server-default/excluded) + client-local keep-on-device, on-demand download, view/edit modes, on-device search. |
 | 2 | Live relay collaboration (client-side merge), account + link sharing, guest mode, rotation-based revocation, version history with client diffs + restore. |
 | 3 | S-Pen ink capture + vector stroke format, LWW/version-vector ink sync (encrypted blobs). |
 | 4 | Rich per-user/per-file config, settings, audit surfacing where applicable, polish. |

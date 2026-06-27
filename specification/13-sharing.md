@@ -16,7 +16,7 @@ The server stores only the opaque wrapped blob; it never sees the FK.
 
 1. The client mints a high-entropy link **token** (≥128-bit) and uses the FK as the **fragment key** (≥256-bit).
 2. It builds the URL: `https://nyxite.app/share/{token}#k=<base64url(FK)>`. The fragment after `#` is **never sent to the server**.
-3. `POST /shares` with `{ kind: link, permission, expiresAt?, linkTokenHash }` — only the **hash** of the token is stored; the FK is not stored at all.
+3. `POST /shares` with `{ targetType, targetId, kind: link, permission, expiresAt?, linkTokenHash }` — only the **hash** of the token is stored; the FK is not stored at all.
 4. The client offers the URL via the Android **share sheet**. The app warns that anyone with the link can access the file (read or write per the share) until it expires or is revoked, and that the key lives in the link.
 
 ## 13.3 Opening a link on this device (guest or member)
@@ -27,7 +27,7 @@ The server stores only the opaque wrapped blob; it never sees the FK.
 
 ## 13.4 Managing shares
 
-- A share-management sheet per file/folder/project: list active shares (`GET /shares?target=`), each with kind, grantee or "link", permission, expiry. Change permission/expiry via `PATCH /shares/{id}`; revoke via `DELETE /shares/{id}`.
+- A share-management sheet per file/folder/project: list active shares (`GET /shares?targetType={file|folder|project}&targetId={id}`), each with kind, grantee or "link", permission, expiry. Change permission/expiry via `PATCH /shares/{id}`; revoke via `DELETE /shares/{id}`.
 - Locally created link URLs may be re-displayed only if the user chose to keep them (stored in encrypted prefs and clearly labeled); otherwise the full URL (with fragment) cannot be reconstructed by the server or app after creation.
 
 ## 13.5 Revocation (two-layer)

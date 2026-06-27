@@ -12,10 +12,12 @@ The server holds **no index** (it can't read content). Search lives where the ke
 
 So Android search is **best-effort over the local subset**; the UI must make this scope explicit ("searching X files on this device — open more or mark them keep-on-device to include them; the desktop searches everything").
 
+**FTS body set = kept files + files currently in the convenience cache.** Titles/metadata of *all* known files stay indexed regardless. If the user **disables the convenience cache** ([16 §16.3](16-offline-and-storage-policies.md)), not-kept bodies are evicted and **drop out of FTS** (their titles remain, so they still surface as "title match only — open to search inside"). Kept-on-device bodies are always indexed.
+
 ## 11.2 Index
 
 - **SQLite FTS5** virtual table `FileContentFts(fileId UNINDEXED, title, body)` inside the SQLCipher DB ([04 §4.3](04-local-data-model.md)). The index is encrypted at rest with the rest of the DB and **never uploaded**.
-- Tokenizer: `unicode61` with diacritic folding; consider `porter` stemming for English; record the choice and keep it consistent. Support prefix queries.
+- Tokenizer (DECISION): **SQLite FTS5 `unicode61`** (diacritic folding) **with `porter` stemming for English**; this choice is recorded and kept consistent across rebuilds. Support prefix queries.
 - **Indexed content**: markdown/plaintext body (the decrypted current head), and titles for every file. Ink files index title only in v1.0.0 (no recognition yet; reserve a hook for recognized-text later, [10 §10.5](10-editors.md)).
 
 ## 11.3 Indexing lifecycle
@@ -30,7 +32,7 @@ So Android search is **best-effort over the local subset**; the UI must make thi
 
 - Search box in the browse screen and a dedicated search screen; debounce input; run FTS on `IO`.
 - Results: title + snippet (`snippet()`/`highlight()` from FTS5) + project/folder breadcrumb + sync/cache badge. Tapping opens the file (fetching+decrypting on demand if only title was indexed).
-- Filters: by project/folder, by content type, by "available offline" (pinned/cached). Sort by relevance or recency.
+- Filters: by project/folder, by content type, by "available offline" (kept/cached). Sort by relevance or recency.
 - Clearly distinguish "found in cached content" from "title match only — open to search inside".
 
 ## 11.5 Privacy

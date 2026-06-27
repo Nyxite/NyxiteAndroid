@@ -5,7 +5,7 @@ The local database is the **offline-first source of truth** for the UI ([01 §1.
 ## 4.1 Storage engine & at-rest encryption
 
 - **Room** over **SQLCipher** (`SupportFactory` with a passphrase). The app is **multi-account from v1.0.0** ([14 §14.7](14-authentication.md)), so there is **one SQLCipher database per account** (`nyxite-{accountId}.db`), each with its **own 256-bit DB master key** generated on first sign-in of that account and stored **wrapped by a hardware-backed Keystore key** (StrongBox when available), unwrapped only after app unlock ([07](07-key-and-device-management.md), [17](17-security.md)). Account databases are never cross-queried.
-- A tiny separate **account registry** (a Proto DataStore file or a minimal standalone SQLCipher DB, itself Keystore-wrapped) lists known accounts (`accountId`, label, instance host, last-active) so the app can show the account switcher and pick a DB to open *before* any account DB is unlocked. It holds no content, names, or keys.
+- A tiny separate **account registry** is a **minimal standalone SQLCipher DB** (encrypted, itself Keystore-wrapped, consistent with the per-account DBs — not Proto DataStore) so the app can show the account switcher and pick a DB to open *before* any account DB is unlocked. Minimal schema, one row per known account: `accountId` (PK), `host` (instance base host), `displayName`, `lastUsedAt` (epoch millis), `dbFileName` (the `nyxite-{accountId}.db` file to open). It holds no content, names, or keys.
 - Because the whole DB is encrypted at rest, decrypted **names**, small **metadata**, and the **FTS index** may be stored as plaintext *inside* the DB. They are still protected by SQLCipher + Keystore + (optional) biometric gate. Identity **private keys** are **not** kept in the DB — they live in the dedicated key store ([07](07-key-and-device-management.md)).
 - Large content blobs (ink/binary ciphertext, decrypted ink for pinned files, cached snapshots) live on the filesystem in `BlobCache`, not in the DB ([16](16-offline-and-storage-policies.md)).
 
@@ -34,12 +34,12 @@ IDs are server-issued **UUIDv7** strings; created-on-device rows generate a UUID
 | `projectId`,`folderId?`,`ownerId` | TEXT | folder null = project root |
 | `name` | TEXT | decrypted file name |
 | `contentType` | TEXT | enum: `markdown`,`plaintext`,`ink`,`sourcecode`,`office`,`image` ([08](08-sync-engine.md)) — immutable |
-| `syncPolicy` | TEXT | server-side policy: `server-default`,`pinned-local`,`excluded` ([08 §8.2](08-sync-engine.md)) |
-| `keepOnDevice` | TEXT? | **per-device** explicit setting: `keep`/`dontKeep`/null=inherit from folder/project ([16 §16.2](16-offline-and-storage-policies.md)) |
+| `syncPolicy` | TEXT | server-side policy enum: `server-default`,`excluded` only ([08 §8.2](08-sync-engine.md)). The server never sees `keepOnDevice` (offline pinning is the separate client-local field below). |
+| `keepOnDevice` | TEXT? | **client-local, per-device** offline-pinning setting: `keep`/`dontKeep`/null=`inherit` from folder/project ([16 §16.2](16-offline-and-storage-policies.md)); never sent to the server |
 | `currentVersionSeq` | INTEGER? | head pointer |
-| `crdtDocId` | TEXT? | for text types |
-| `keyGeneration` | INTEGER | current FK generation |
-| `metadataJson` | TEXT? | decrypted per-file metadata (incl. local version-vector for LWW) |
+| `crdtDocId` | TEXT? | **client-allocated UUIDv7 at file creation** (required for text types, null otherwise); sent in the create-file request |
+| `keyGeneration` | INTEGER | monotonic FK rotation counter (1:1 with the current `key_id`); drives `412 key_generation_stale` handling. The `key_id` (uuid) is the stable frame/crdt/version reference for a specific file-key; `keyGeneration` is the rotation generation. |
+| `metadataJson` | TEXT? | decrypted per-file metadata. For ink/binary it carries the per-file LWW **version-vector**: a `{ deviceId -> counter }` map (see [08 §8.5](08-sync-engine.md)), incremented on each local committed ink edit and compared component-wise to classify equal/ancestor/concurrent. |
 | `createdAt`,`updatedAt`,`deletedAt?` | INTEGER | |
 | `contentHash` | BLOB? | BLAKE3 of head plaintext (cache) |
 | `syncState` | TEXT | local state machine ([§4.4](#44-sync-state)) |
@@ -49,7 +49,10 @@ IDs are server-issued **UUIDv7** strings; created-on-device rows generate a UUID
 Indexes: `projectId`, `folderId`, `ownerId`, `syncState`, `keepOnDevice`, `(keepOnDevice, lastOpenedAt)`. Effective keep-on-device is resolved by walking `file.keepOnDevice` → nearest ancestor `keepOnDeviceDefault` → account default (not kept).
 
 ### FileKeyEntity (locally unwrapped/wrapped cache)
-`fileId`, `keyId`, `generation`, `memberId?`, `wrappedKey` BLOB (as fetched from server, for re-upload/rotation), and a transient unwrapped handle that is **never persisted in plaintext** — the unwrapped FK is held only in memory / re-derived on demand via the identity key. PK `(fileId, keyId, memberId)`.
+`id` (TEXT PK, **UUIDv7 surrogate key** — mirrors the server C1 fix), `fileId`, `keyId`, `generation`, `memberId?`, `shareId?`, `wrappedKey` BLOB (as fetched from server, for re-upload/rotation), and a transient unwrapped handle that is **never persisted in plaintext** — the unwrapped FK is held only in memory / re-derived on demand via the identity key.
+
+- **Invariant (CHECK)**: exactly one of `memberId` / `shareId` is non-null (a wrapped key targets either an account member or a link share, never both).
+- **Indices**: unique `(fileId, keyId, memberId)` scoped to `memberId IS NOT NULL`, and unique `(fileId, keyId, shareId)` scoped to `shareId IS NOT NULL`.
 
 ### FileVersionEntity
 `id` PK, `fileId`, `seq`, `contentHash` BLOB, `blobRef` TEXT, `sizeCipher`, `keyId`, `authorId?`, `createdAt`. Unique `(fileId, seq)`. Index `(fileId, seq DESC)`.

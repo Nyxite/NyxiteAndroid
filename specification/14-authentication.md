@@ -15,7 +15,7 @@ Account authentication is **Keycloak OIDC with TOTP**; it yields an API token bu
 ## 14.3 Token storage & refresh
 
 - Store **access + refresh tokens** in secret storage: `EncryptedSharedPreferences` or a Keystore-wrapped blob — **never** in Room or logs ([04 §4.6](04-local-data-model.md),[17](17-security.md)).
-- `AuthInterceptor` attaches the bearer; on `401 token_expired`, perform a single silent refresh (AppAuth `performTokenRequest`) and retry; on refresh failure, surface re-login.
+- **Token lifetimes** (match server): the OIDC **access token is ~5 min**, so refresh is routine; `AuthInterceptor` attaches the bearer; on `401 token_expired`, perform a single silent refresh (AppAuth `performTokenRequest`) and retry; on refresh failure, surface re-login. (Guest share-session and relay-ticket lifetimes are in [§14.5](#145-share-token-sessions-guests).)
 - Logout clears tokens and locks the `UserSession` (zeroizes the in-memory identity key) but **does not** delete enrolled keys/local data unless the user chooses "forget this device" ([07](07-key-and-device-management.md)).
 
 ## 14.4 Relationship to device enrollment
@@ -29,7 +29,9 @@ Until the identity key is present, the app can show structure (encrypted names w
 
 ## 14.5 Share-token sessions (guests)
 
-For link shares, the app obtains a **short-lived, relay-scoped share session token** from `GET /share/{token}` (no Keycloak login) to authorize relay/ciphertext access; the decryption key is the URL fragment ([13 §13.3](13-sharing.md),[09 §9.8](09-realtime-collaboration.md)). Guest sessions are bounded by token lifetime + share validity and run without the full key/device subsystem.
+For link shares, the app obtains a **short-lived, relay-scoped share session token** from `GET /share/{token}` (no Keycloak login) to authorize relay/ciphertext access; the decryption key is the URL fragment ([13 §13.3](13-sharing.md),[09 §9.8](09-realtime-collaboration.md)). **Lifetimes** (match server): the guest **share-session token is 15 min, renewable**; the **relay socket ticket is single-use, 60 s**. Guest sessions are bounded by token lifetime + share validity and run without the full key/device subsystem.
+
+**Guest storage model**: a guest session runs **without the per-account SQLCipher DB**. Guest content is held in an **ephemeral in-memory cache only** and is **never written to any account database or `noBackup` files**; decrypted views are transient and discarded when the session ends ([09 §9.8](09-realtime-collaboration.md)).
 
 ## 14.6 App lock
 

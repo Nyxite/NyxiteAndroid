@@ -98,7 +98,7 @@ Sample      = [ x, y, pressure, tilt, orientation, tRelMs ]   # fixed-order arra
 | Index scope | titles for all known files; bodies for kept + currently-cached files only |
 | Reindex | incremental on decrypt; full rebuild only on schema change/corruption |
 
-**Still to confirm with the server**: whether `sync_policy` is **per-device or shared** across a user's devices. Keep-on-device is inherently per-device; if the server's policy field is shared, the per-device selection is tracked **client-side only** (the field then conveys only the cross-device "prefer offline" hint). Open a tracking item against the server spec ([08 §8.2](08-sync-engine.md)).
+**RESOLVED (server-aligned)**: the server `syncPolicy` enum is **only `{ server-default, excluded }`** — `pinned-local` is removed. Offline pinning is the **separate client-local `keepOnDevice` field** (`keep`/`dontKeep`/`inherit`), which is **never sent to the server**, so the per-device-vs-shared question is moot. See [08 §8.2](08-sync-engine.md), [04 §4.2](04-local-data-model.md), [16 §16.2](16-offline-and-storage-policies.md).
 
 **How to validate**: measure index size/battery for a representative kept set on a mid device.
 
@@ -106,14 +106,14 @@ Sample      = [ x, y, pressure, tilt, orientation, tRelMs ]   # fixed-order arra
 
 ## 19.6 Server-owned protocol items (track & confirm)
 
-These are **server `[P]` decisions** the client must match exactly once ratified; the "fix" is to **lock each via shared conformance vectors** ([18 §18.6](18-build-ci-testing.md)) and fail CI on any drift — not to decide them unilaterally on Android.
+These track the **server's canonical ledger**; the client must match each exactly and **lock it via shared conformance vectors** ([18 §18.6](18-build-ci-testing.md)), failing CI on any drift. Most are now **pinned**; the remainder stay "track & confirm".
 
-- Exact `magic` / frame `version` bytes and AAD construction ([06 §6.3](06-cryptography.md)).
-- Final algorithm choices and **HPKE suite IDs** (must equal X25519 + HKDF-SHA256 + AES-256-GCM) ([06 §6.2](06-cryptography.md)).
-- Recovery-escrow scheme (HPKE vs. AES-GCM under the Argon2id-derived key) ([07 §7.4](07-key-and-device-management.md)).
-- Exact `POST /sync/changes` and `GET /sync/manifest` payload shapes and `ref` formats ([08 §8.3](08-sync-engine.md)).
-- Snapshot/compaction trigger thresholds and the server prune window ([09 §9.6](09-realtime-collaboration.md)).
-- Share-token session lifetime and scope ([14 §14.5](14-authentication.md)).
+- **PINNED** — frame `magic` = ASCII `"NYXC"` (`0x4E 0x59 0x58 0x43`), `version` = `0x01`, AAD = `magic ‖ version ‖ key_id ‖ file_id ‖ object_kind`, with the `object_kind` enum (blob=1…settings=7) ([06 §6.3](06-cryptography.md)).
+- **PINNED** — **HPKE suite IDs**: DHKEM(X25519, HKDF-SHA256)/HKDF-SHA256/AES-256-GCM = `KEM 0x0020`, `KDF 0x0001`, `AEAD 0x0002` ([06 §6.2](06-cryptography.md)).
+- **PINNED** — recovery-escrow scheme = **AES-256-GCM under the Argon2id-derived key** (not HPKE), shape + `AAD = userId ‖ version` ([06 §6.4](06-cryptography.md), [07 §7.4](07-key-and-device-management.md)).
+- **PINNED** — snapshot/compaction triggers (**≥ 200 updates / 5 min / last-leave**) ([09 §9.6](09-realtime-collaboration.md)).
+- **PINNED** — token lifetimes: access ~5 min; guest share-session 15 min renewable; relay socket ticket single-use 60 s ([14 §14.5](14-authentication.md)).
+- *Track & confirm* — exact `POST /sync/changes` and `GET /sync/manifest` payload shapes and `ref` formats still reference the server spec ([08 §8.3](08-sync-engine.md)).
 
 **Action**: open a tracking item per bullet against the server spec; add a failing-by-default conformance test for each that turns green when the server pins the value.
 
@@ -147,7 +147,7 @@ These are **server `[P]` decisions** the client must match exactly once ratified
 | 19.2 | Key/lock/enrollment | 10-min window; QR+code; BIP39-24 | Hardware spike (StrongBox/biometric across OEMs) | Android | Phase 0 |
 | 19.3 | Argon2id params | m=64 MiB, t=3, p=1 | Tune on device trio | Android | Phase 0 |
 | 19.4 | Ink format | Deterministic CBOR | Joint desktop spec + round-trip tests | Android + Desktop | Before Phase 3 |
-| 19.5 | Local retention | Keep-on-device (no auto-budget); no plaintext export | Confirm server `sync_policy` per-device vs shared | Android + Server | Phase 1 |
+| 19.5 | Local retention | **Resolved**: `syncPolicy` = {server-default, excluded}; pinning = client-local `keepOnDevice` (never sent to server); no plaintext export | — | Android | Done |
 | 19.6 | Protocol `[P]` values | — | Track + conformance lock | Server → Android | Per phase |
 | 19.7 | Realtime client | Official SignalR client | Spike (reconnect, guest token) | Android | Before Phase 2 |
 | 19.8 | Distribution | Play + signed APK | Instance-host setup UX | Owner | Phase 4 |

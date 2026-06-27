@@ -2,7 +2,7 @@
 
 Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt and low-latency ink.
 
-**Privacy first / full E2EE.** Encryption, decryption, and CRDT merge happen **on the device**. The server only ever sees ciphertext. The device holds the user's keys, decrypts content for display, and re-encrypts edits before upload. Search and offline reach are bounded by mobile storage/battery, so the device indexes its **local cached subset**, not necessarily the whole corpus.
+**Privacy first / full E2EE.** Encryption, decryption, and CRDT merge happen **on the device**. The server only ever sees ciphertext. The device holds the user's keys, decrypts content for display, and re-encrypts edits before upload. Search and offline reach are bounded by mobile storage/battery, so the device indexes its **local cached subset** (keep-on-device + recently opened), not necessarily the whole corpus.
 
 ## Editing
 
@@ -15,7 +15,7 @@ Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt a
 
 ## Sync
 
-- Per-file sync policy controls: server-default, pinned-local, excluded
+- Per-file server sync policy: server-default, excluded; offline pinning is the separate client-local keep-on-device control (never sent to the server)
 - Content is encrypted on-device before upload and decrypted after download (the server moves ciphertext only)
 
 ## Collaboration
@@ -25,7 +25,7 @@ Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt a
 
 ## Search
 
-- **Client-side** full-text search over the device's local (cached / pinned-local) subset; the desktop is the full-corpus surface
+- **Client-side** full-text search over the device's local (keep-on-device + cached) subset; the desktop is the full-corpus surface
 
 ## Version history
 

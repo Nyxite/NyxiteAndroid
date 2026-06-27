@@ -11,13 +11,16 @@ The Android device is a full cryptographic peer. It generates file keys, encrypt
 | Purpose | Algorithm | Android mapping |
 |---------|-----------|-----------------|
 | Content / CRDT / snapshot encryption | **AES-256-GCM** (96-bit nonce, 128-bit tag) | Tink `AesGcm` / JCE `AES/GCM/NoPadding` |
-| File-key wrapping to a member | **HPKE**: X25519 + HKDF-SHA256 + AES-256-GCM | Tink HPKE (`HybridEncrypt`/`HybridDecrypt`) — **verify suite IDs** ([§6.4](#64-hpke-wrapping)) |
+| Public-key wrap (file-key to a member, device enrollment to a device pubkey) | **HPKE**: DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / AES-256-GCM — RFC 9180 IDs `KEM=0x0020`, `KDF=0x0001`, `AEAD=0x0002` | Tink HPKE (`HybridEncrypt`/`HybridDecrypt`) — **verify suite IDs** ([§6.4](#64-hpke-wrapping)) |
+| Symmetric wrap (recovery blob) | **AES-256-GCM** under an Argon2id-derived key | JCE/Tink AES-GCM ([§6.4](#64-hpke-wrapping), [07 §7.4](07-key-and-device-management.md)) |
 | Identity key agreement | **X25519** | Tink / `XDH` |
 | Signing (updates, key-directory entries) | **Ed25519** | Tink `PublicKeySign`/`PublicKeyVerify` |
-| Recovery-key derivation | **Argon2id → wrapping key** | argon2-jvm; params from `recovery_blobs.kdf_params` |
+| Recovery-key derivation | **Argon2id → wrapping key** (m = 64 MiB, t = 3, p = 1; tunable, stored in `recovery_blobs.kdf_params`) | argon2-jvm |
 | Plaintext hashing (content address) | **BLAKE3-256** | BLAKE3 JVM lib |
 
-All are **[P]** until ratified, but the client must track whatever the server's `07` finalizes.
+These values are **pinned to the server's canonical ledger** and must be byte-identical across clients; the client tracks the server's `07` and fails CI on any drift ([18 §18.5](18-build-ci-testing.md)).
+
+**System rule — HPKE vs AES-256-GCM**: use **HPKE wherever the target is a public key** (file-key wrap to members, device enrollment to a device pubkey); use **AES-256-GCM wherever the key is symmetric** (all content + the recovery blob).
 
 ## 6.3 Encrypted object framing
 
@@ -27,11 +30,11 @@ Every ciphertext object (blob, snapshot, CRDT update, encrypted name/title, encr
 magic(4) | version(1) | key_id(16) | nonce(12) | ciphertext(...) | gcm_tag(16)
 ```
 
-- `magic` — fixed Nyxite identifier (from server spec).
-- `version` — frame/crypto-agility version; the client refuses to *misread* a newer version it doesn't understand and surfaces an "update required" state.
-- `key_id` — 16-byte identifier of the file key **and rotation generation** used. The server cannot resolve it to a usable key; the client maps it to a local FK handle.
+- `magic` — fixed 4-byte Nyxite identifier: ASCII **`"NYXC"`** (`0x4E 0x59 0x58 0x43`).
+- `version` — 1-byte frame/crypto-agility version, currently **`0x01`**; the client refuses to *misread* a newer version it doesn't understand and surfaces an "update required" state.
+- `key_id` — 16-byte identifier (uuid) of the **specific file key** used. The server cannot resolve it to a usable key; the client maps it to a local FK handle. `key_id` is 1:1 with the integer `keyGeneration` rotation counter ([04 §4.2](04-local-data-model.md)) and is the stable frame/crdt/version reference.
 - `nonce` — 96-bit, **unique per (key, message)**. Use a CSPRNG; never reuse a nonce under the same key (a hard invariant for GCM). For high-volume CRDT updates under one FK, ensure nonce uniqueness via random 96-bit nonces (collision-negligible) — documented and tested.
-- **AAD** binds the frame to its `file_id` and **object kind** (`blob`/`snapshot`/`crdt`/`name`/`metadata`/`awareness`/`settings`). Decryption supplies the same AAD; a mismatch fails authentication, preventing cross-context reuse of ciphertext.
+- **AAD** = `magic ‖ version ‖ key_id ‖ file_id(16) ‖ object_kind(1)`, binding the frame to its file and object kind. Decryption supplies the same AAD; a mismatch fails authentication, preventing cross-context reuse of ciphertext. The `object_kind` enum (1 byte): `blob = 1`, `snapshot = 2`, `crdt = 3`, `name = 4`, `metadata = 5`, `awareness = 6`, `settings = 7`.
 
 `CryptoEngine` exposes:
 ```kotlin
@@ -41,9 +44,11 @@ fun open(frame: ByteArray, fk: FileKeyHandle, kind: ObjectKind, fileId: Uuid): B
 
 ## 6.4 HPKE wrapping (account shares & key recovery)
 
-- To share a file to a user (account share) or wrap an FK to the owner, the client fetches the recipient's **X25519 public key** from the directory ([13](13-sharing.md)) and HPKE-seals the 32-byte FK to it. The result is the `wrapped_key` blob stored server-side; only the recipient's device can `HybridDecrypt` it with the identity private key.
-- HPKE **suite must equal X25519 + HKDF-SHA256 + AES-256-GCM**. Tink's HPKE templates must be configured to exactly this KEM/KDF/AEAD; a **conformance test wraps with Android-Tink and unwraps with the server's/desktop's HPKE (and vice-versa)** using fixed vectors ([18](18-build-ci-testing.md)). If Tink's defaults differ, configure explicit `HpkeParameters`.
-- The same HPKE primitive wraps the **identity private key** to the recovery key's derived wrapping key for the recovery escrow ([07 §7.4](07-key-and-device-management.md)) — or AES-GCM with the Argon2id-derived key, matching the server's chosen scheme.
+> Naming note: this section also covers the **symmetric** recovery wrap (AES-256-GCM); the rule is HPKE for public-key targets, AES-256-GCM for symmetric keys (§6.2).
+
+- To share a file to a user (account share), wrap an FK to the owner, or enroll a new device, the client fetches the recipient's **X25519 public key** from the directory ([13](13-sharing.md)) and HPKE-seals the payload to it. The result is the `wrapped_key`/`wrappedIdentityKey` blob stored server-side; only the recipient's device can `HybridDecrypt` it with the identity private key.
+- HPKE **suite must equal DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / AES-256-GCM** — RFC 9180 IDs `KEM=0x0020`, `KDF=0x0001`, `AEAD=0x0002`. Tink's HPKE templates must be configured to exactly this KEM/KDF/AEAD; a **conformance test wraps with Android-Tink and unwraps with the server's/desktop's HPKE (and vice-versa)** using fixed vectors ([18](18-build-ci-testing.md)). If Tink's defaults differ, configure explicit `HpkeParameters`.
+- **Recovery escrow uses AES-256-GCM, not HPKE** (DECISION — resolves the prior HPKE-vs-AES indecision). The recovery blob is the identity bundle (X25519 priv ‖ Ed25519 priv) sealed with **AES-256-GCM under the Argon2id-derived wrapping key** ([07 §7.4](07-key-and-device-management.md)). This follows the system rule (§6.2): HPKE only where the target is a public key; AES-256-GCM where the key is symmetric.
 
 ## 6.5 File keys
 
@@ -65,8 +70,9 @@ fun open(frame: ByteArray, fk: FileKeyHandle, kind: ObjectKind, fileId: Uuid): B
 
 ## 6.8 Recovery-key derivation
 
-- The recovery key is a high-entropy phrase shown once. The wrapping key is derived via **Argon2id** with parameters stored (non-secret) in `recovery_blobs.kdf_params`. The client must read those params for unwrap and use them when (re)generating the escrow so any device can recover ([07 §7.4](07-key-and-device-management.md)).
-- Memory-hard parameters are tuned for mobile (a spike must pick `(memory, iterations, parallelism)` that complete in a few seconds on mid-range devices without OOM, recorded in `kdf_params`).
+- The recovery key is a high-entropy phrase shown once. The wrapping key is derived via **Argon2id** with parameters **m = 64 MiB, t = 3, p = 1** (tunable; the actual values are stored non-secret in `recovery_blobs.kdf_params`). The client reads those params for unwrap and uses them when (re)generating the escrow so any device can recover ([07 §7.4](07-key-and-device-management.md)).
+- The derived key then seals the escrow with **AES-256-GCM** (not HPKE — symmetric key, per §6.4). The recovery-blob shape is `{ version, kdf:{alg:"argon2id", m, t, p, salt(16)}, nonce(12), ciphertext, tag(16) }` with **AAD = `userId ‖ version`** ([07 §7.4](07-key-and-device-management.md)).
+- Memory-hard parameters stay tuned for mobile (a hardware spike confirms the chosen `(m, t, p)` complete in a few seconds on mid-range devices without OOM, recorded in `kdf_params`).
 
 ## 6.9 Implementation rules
 

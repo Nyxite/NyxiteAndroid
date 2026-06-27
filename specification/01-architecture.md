@@ -83,13 +83,13 @@ Repository interfaces (`FileRepository`, `StructureRepository`, `KeyRepository`,
 
 - **Threading**: Kotlin coroutines + `Flow`. A small set of dispatchers via an injected `DispatcherProvider`: `Main` (UI), `Default` (CRDT merge, diff, crypto-bound CPU), `IO` (DB, network, file). Crypto on `Default`; never on `Main`.
 - **Active editing/collaboration**: while a document is open, a **foreground service** (`CollabService`, type `dataSync`) maintains the SignalR connection and shows a low-priority notification, so the relay survives brief backgrounding.
-- **Periodic/opportunistic sync**: `WorkManager` jobs — `DeltaSyncWorker` (constraint: network; periodic + expedited on app foreground), `BlobPrefetchWorker` (pinned-local; constraint: unmetered/charging configurable), `ReindexWorker`, `KeyRotationWorker`. See [08](08-sync-engine.md) and [16](16-offline-and-storage-policies.md).
+- **Periodic/opportunistic sync**: `WorkManager` jobs — `DeltaSyncWorker` (constraint: network; periodic + expedited on app foreground), `BlobPrefetchWorker` (keep-on-device content; constraint: unmetered/charging configurable), `ReindexWorker`, `KeyRotationWorker`. See [08](08-sync-engine.md) and [16](16-offline-and-storage-policies.md).
 - **Snapshotting**: a client trigger (N updates / time / graceful leave) enqueues `SnapshotWorker` to compact the local Yrs doc into an encrypted snapshot and upload it ([09 §5.6](09-realtime-collaboration.md), [12](12-version-history.md)).
 
 ## 1.7 Error & connectivity model
 
 - The UI always renders from `LocalStore`; network failures degrade gracefully to "offline / pending changes N".
-- A per-file **sync state machine** (`Synced`, `PendingPush`, `PendingPull`, `Conflicted(LWW)`, `Rotating`, `Error`) is persisted and surfaced as small badges ([08](08-sync-engine.md)).
+- A per-file **sync state machine** — canonical set `Synced`, `PendingPush`, `PendingPull`, `Downloading`, `Uploading`, `Conflicted`, `Rotating`, `Excluded`, `Error(code)` (identical to [04 §4.4](04-local-data-model.md) and [08 §8.8](08-sync-engine.md)) — is persisted and surfaced as small badges ([08](08-sync-engine.md)).
 - Server `problem+json` codes map to typed `NyxiteApiError` (e.g. `key_generation_stale` → trigger refetch+rotate, `share_revoked`/`link_expired` → mark dead, `excluded_content` → never retry upload, `429` → backoff with `Retry-After`). See [05 §5.4](05-api-client.md).
 
 ## 1.8 Dependency injection

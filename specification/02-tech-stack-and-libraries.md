@@ -21,7 +21,7 @@ Concrete choices with rationale. Versions are **[P]** floors at time of writing;
 | Adaptive layouts | **`androidx.compose.material3.adaptive`** (list/detail) + window size classes | Phone/tablet/foldable panes. |
 | Navigation | **Navigation-Compose 2.8 type-safe** (`@Serializable` routes) | Compile-checked args; deep links for share URLs ([13](13-sharing.md),[15](15-ui-and-navigation.md)). |
 | Image loading | **Coil 3** | Thumbnails/avatars (decoded from decrypted bytes only). |
-| Markdown render | **Markwon** (Android views via `AndroidView`) *or* a Compose markdown renderer | View-mode rendering ([10](10-editors.md)); evaluate both, prefer a Compose-native renderer if mature. |
+| Markdown render | **Markwon** (Android views via `AndroidView`) | View-mode rendering ([10](10-editors.md)); chosen for v1.0.0 as the mature, battle-tested option. A Compose-native renderer is a later swap once that ecosystem matures. |
 
 ## 2.3 Ink / stylus (the differentiator)
 
@@ -72,8 +72,8 @@ All primitives must match the server's algorithm table ([server 07 §7.3](https:
 | Purpose | Library | Notes |
 |---------|---------|-------|
 | AEAD (AES-256-GCM), HPKE (X25519+HKDF-SHA256+AES-256-GCM), Ed25519, X25519 | **Google Tink (Android)** | First-class HPKE and signature/hybrid primitives; integrates with Android Keystore for key wrapping. **Validate Tink's HPKE suite IDs match the server's exactly** ([06 §6.4](06-cryptography.md)). |
-| BLAKE3-256 (content addressing) | **A maintained BLAKE3 JVM/Kotlin lib** (e.g. a JNI or pure-Kotlin BLAKE3) | Not in Tink; pick one with test vectors and benchmark for large blobs. **[P]** |
-| Argon2id (recovery-key derivation) | **argon2-jvm** (`de.mkammerer:argon2-jvm`, libsodium JNI) or equivalent | Parameters come from `recovery_blobs.kdf_params`; verify constant-time and arm64 binaries. **[P]** |
+| BLAKE3-256 (content addressing) | **A maintained BLAKE3 JVM/Kotlin lib** (e.g. a JNI or pure-Kotlin BLAKE3) | Confirmed dependency (approach settled); not in Tink. The specific artifact is chosen at impl time — pick one with test vectors and benchmark for large blobs. |
+| Argon2id (recovery-key derivation) | **argon2-jvm** (`de.mkammerer:argon2-jvm`, libsodium JNI) or equivalent | Confirmed dependency (approach settled). Parameters come from `recovery_blobs.kdf_params`; verify constant-time and arm64 binaries. |
 | Hardware-backed key storage | **Android Keystore** (`AndroidKeyStore` provider) + **StrongBox** when available | Wraps the DB master key and the identity-key store ([07](07-key-and-device-management.md)). |
 | Biometric unlock | **`androidx.biometric`** | Gate app/key unlock with device credential/biometric ([17](17-security.md)). |
 

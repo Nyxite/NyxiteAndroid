@@ -20,7 +20,7 @@ The Keystore key is the on-device root of trust: it is generated in hardware, ne
 - Generate an **`AndroidKeyStore`** AES key (`setIsStrongBoxBacked(true)` when `FEATURE_STRONGBOX_KEYSTORE` is present; fall back gracefully). Use it to wrap:
   - the **DB master key** (SQLCipher passphrase),
   - the **Identity Key Store** blob (the X25519+Ed25519 private keys, themselves serialized and AES-GCM-encrypted).
-- Configure `setUserAuthenticationRequired(true)` with a validity window or per-use auth (via `BiometricPrompt` → `CryptoObject`) for the unlock operation, per the user's security setting ([17](17-security.md)).
+- Configure `setUserAuthenticationRequired` **per the user's security setting; default on with a 10-minute validity window** (configurable 1–60 min, or per-use auth via `BiometricPrompt` → `CryptoObject`) for the unlock operation ([17](17-security.md), [19 §19.2](19-open-questions.md)).
 - The unlocked identity private keys live only in the in-memory `UserSession` ([01 §1.8](01-architecture.md)); on lock/logout the session is cleared and buffers zeroized.
 - **StrongBox caveat**: StrongBox has small key/throughput limits — use it for the wrapping key only, not for bulk content; do bulk AES-GCM in software with FK material in memory.
 
@@ -29,13 +29,13 @@ The Keystore key is the on-device root of trust: it is generated in hardware, ne
 ### First device / first sign-in
 1. User authenticates with Keycloak (OIDC + TOTP) → access token ([14](14-authentication.md)).
 2. App checks the key directory (`GET /keys/directory?userId=me`): if the user has **no identity keypair yet** (brand-new account), generate X25519 + Ed25519, store privates in the Keystore-wrapped identity store, and **publish publics** via `PUT /keys`.
-3. Generate a **device keypair**; register the device via `POST /devices` with its `label` + `pubkey`.
+3. Generate a **device keypair**; register the device via `POST /devices { label, pubkey }` → `{ deviceId, status: "pending", pairingCode, qrPayload }`.
 4. Generate the **recovery key** and escrow ([§7.4](#74-recovery-key)). Force the user through the recovery-key flow before completing setup.
 
 ### Additional device (user already has an identity keypair elsewhere)
 This device has the account token but **not** the identity private key. Two paths:
 
-- **(A) Device-to-device approval.** New device registers (`POST /devices`, status pending) and displays a code/QR. An already-enrolled device approves via `POST /devices/{id}/approve`; the approving device HPKE-wraps the identity private key to the new device's `pubkey` and uploads it (server relays the opaque blob). The new device unwraps with its device private key. Interactive confirmation required on the enrolled device.
+- **(A) Device-to-device approval.** New device registers (`POST /devices { label, pubkey }` → `status: "pending"` + `pairingCode`/`qrPayload`) and displays the QR (primary) + 6–8 digit numeric code (fallback). An already-enrolled device approves via `POST /devices/{id}/approve { wrappedIdentityKey }`, where `wrappedIdentityKey = HPKE-seal(newDevicePubkey, identity bundle)`; the server relays the opaque blob. The new device fetches it once via `GET /devices/me/enrollment` → `{ wrappedIdentityKey }` (**single-use**; the server deletes the blob after the fetch) and unwraps with its device private key. Interactive confirmation required on the enrolled device.
 - **(B) Recovery-key unwrap.** User enters the recovery phrase; the app fetches the escrow blob (`GET /recovery` + `kdf_params`), derives the wrapping key (Argon2id), unwraps the identity private key, then stores it Keystore-wrapped and proceeds. This is the path when no other device is available.
 
 Until enrolled with the identity private key, the device can authenticate and see structure (encrypted) but **cannot decrypt content**; the UI shows a clear "enroll this device" state.
@@ -43,7 +43,7 @@ Until enrolled with the identity private key, the device can authenticate and se
 ## 7.4 Recovery key
 
 - Generated as a **BIP39 24-word phrase** (256-bit, checksummed, vetted word list) **shown once**. The app must make the user record it (copy, write down, confirm by re-entry) and warn unmistakably: **losing all devices and this phrase = permanent, unrecoverable data loss** (no server/admin escrow exists).
-- The app derives a wrapping key via **Argon2id** (m = 64 MiB, t = 3, p = 1, tuned on hardware — [06 §6.8](06-cryptography.md)) and wraps an escrow of the identity private key; uploads the **opaque** escrow + non-secret `kdf_params` via `PUT /recovery`. The server stores it but cannot open it.
+- The app derives a wrapping key via **Argon2id** (m = 64 MiB, t = 3, p = 1, tunable, tuned on hardware — [06 §6.8](06-cryptography.md)) and **seals the identity bundle (X25519 priv ‖ Ed25519 priv) with AES-256-GCM** under that derived key (DECISION: AES-GCM, **not** HPKE — symmetric key, [06 §6.4](06-cryptography.md)). The recovery-blob shape is `{ version, kdf:{alg:"argon2id", m, t, p, salt(16)}, nonce(12), ciphertext, tag(16) }` with **AAD = `userId ‖ version`**. It uploads the **opaque** escrow + non-secret `kdf_params` via `PUT /recovery`. The server stores it but cannot open it.
 - Re-issuing a recovery key (rotation) re-wraps the escrow under a new phrase and re-uploads; old phrase invalidated client-side by overwrite.
 - The recovery key is **never** stored on the device in plaintext; if the user opts to keep a copy, it is their responsibility outside the app.
 
@@ -57,10 +57,10 @@ Until enrolled with the identity private key, the device can authenticate and se
 
 When a share is revoked ([13](13-sharing.md)), a remaining member's client must rotate the FK so removed members cannot read **future** content:
 
-1. Generate a new FK (new generation).
+1. Generate a new FK (new `keyId`, `generation + 1`).
 2. Re-encrypt the current head (and produce a fresh snapshot) under the new FK.
 3. Re-wrap the new FK to every **remaining** member's public key.
-4. `POST /files/{id}/keys/rotate` with the re-wrapped keys + new head ciphertext ref; server bumps `key_generation`.
+4. `POST /files/{id}/keys/rotate { newKeyId, generation, wrappedKeys[], newHeadRef }`; the server bumps `key_generation`. If another member's rotation already won, the server returns **`409`** — abandon this attempt and refetch the new generation.
 5. Peers see the `keyrotate` change in delta sync ([08](08-sync-engine.md)) and refetch their wrapped key.
 
 The server simultaneously drops the removed member's ACL grant (instant cutoff) even before rotation completes. Already-downloaded ciphertext cannot be un-seen (inherent). Rotation runs in the background via `KeyRotationWorker`; the file shows `Rotating` state ([04 §4.4](04-local-data-model.md)).

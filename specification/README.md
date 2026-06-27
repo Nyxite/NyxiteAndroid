@@ -10,7 +10,7 @@ It is written to be **self-contained enough to build the app from**: it names th
 
 **Nyxite is end-to-end encrypted everywhere.** Encryption, decryption, content addressing, CRDT merge, search indexing, and diffing all happen **on the device**. The server only ever sees ciphertext, opaque IDs, the structure graph, ACL grants, wrapped-key blobs, sizes and timestamps — it never holds a content key and cannot read notes, ink, names, or collaboration traffic. The Android client is therefore not a thin viewer: it is a **full cryptographic peer** that holds the user's keys, performs all crypto locally, and treats the server as a blind relay/store.
 
-The client-side burden is real and deliberate: search and offline reach are bounded by mobile storage/battery, so the device indexes and caches its **local subset** (pinned-local + recently opened), not necessarily the whole corpus. The desktop remains the full-corpus surface.
+The client-side burden is real and deliberate: search and offline reach are bounded by mobile storage/battery, so the device indexes and caches its **local subset** (keep-on-device + recently opened), not necessarily the whole corpus. The desktop remains the full-corpus surface.
 
 ## Source of truth & convention
 

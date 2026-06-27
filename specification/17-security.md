@@ -18,7 +18,7 @@ The server-side threat model is covered by [server 13](https://github.com/Nyxite
 
 ## 17.2 Key & data protection
 
-- **Root of trust**: a hardware-backed `AndroidKeyStore` key (StrongBox when available) wraps the DB master key and the identity-key store ([07 §7.2](07-key-and-device-management.md)). Configure `setUserAuthenticationRequired` per the user's app-lock setting, using `BiometricPrompt` + `CryptoObject` to unlock.
+- **Root of trust**: a hardware-backed `AndroidKeyStore` key (StrongBox when available) wraps the DB master key and the identity-key store ([07 §7.2](07-key-and-device-management.md)). Configure `setUserAuthenticationRequired` per the user's app-lock setting — **default on with a 10-minute validity window** (configurable 1–60 min, or per-use), consistent with [07 §7.2](07-key-and-device-management.md) and [§17.3](#173-app-lock) — using `BiometricPrompt` + `CryptoObject` to unlock.
 - **DB at rest**: SQLCipher with the Keystore-protected passphrase; covers structure, decrypted names, metadata, and the FTS index. With multi-account ([14 §14.7](14-authentication.md)) there is **one DB and one master key per account**, so a compromise scoped to one account's key cannot read another account's data; account removal destroys that account's DB, cache, index, tokens, and Keystore-wrapped keys.
 - **Blob cache**: ciphertext is safe as-is; decrypted pinned plaintext lives in app-private storage and is acceptable because the DB/keys protecting access are themselves gated — but treat it as sensitive (no backup, evictable, cleared on "forget device").
 - **Tokens**: OIDC tokens in `EncryptedSharedPreferences`/Keystore-wrapped, never in Room/logs ([14](14-authentication.md)).

@@ -9,7 +9,7 @@ Before Phase 1 logic is committed, run the **early spikes** ([18 §18.8](18-buil
 **Done when**: a user can log in, enroll the device, set a recovery key, recover on a second device, and browse/create the encrypted project/folder/file structure offline-first; crypto KATs + cross-client vectors pass.
 
 ## Phase 1 — Notes that sync (single user)
-**Deliver**: markdown + plaintext editors with view/edit modes ([10](10-editors.md)); encrypted CRDT backbone with offline catch-up (relay optional here) ([08 §8.4](08-sync-engine.md),[09](09-realtime-collaboration.md)); ciphertext blob sync + on-demand download; **user-driven keep-on-device** retention at file/folder/project + the three sync policies ([16](16-offline-and-storage-policies.md)); on-device FTS search ([11](11-search.md)).
+**Deliver**: markdown + plaintext editors with view/edit modes ([10](10-editors.md)); encrypted CRDT backbone with offline catch-up (relay optional here) ([08 §8.4](08-sync-engine.md),[09](09-realtime-collaboration.md)); ciphertext blob sync + on-demand download; **user-driven keep-on-device** retention at file/folder/project (client-local) + the server sync policies (`server-default`/`excluded`) ([16](16-offline-and-storage-policies.md)); on-device FTS search ([11](11-search.md)).
 **Done when**: a single user edits notes on the phone, they sync to another device through the encrypted relay/REST, offline edits reconcile, and local search works over the cached subset.
 
 ## Phase 2 — Collaboration & sharing

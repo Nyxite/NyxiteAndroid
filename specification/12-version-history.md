@@ -20,9 +20,9 @@ Full history of **encrypted, content-addressed snapshots**; **diffs and restore 
 
 ## 12.4 Restore (non-destructive)
 
-`POST /files/{id}/restore` records a **new head** derived from version `n`; prior versions are untouched.
+`POST /files/{id}/restore` with body **`{ seq }`** only records a **new head** derived from version `seq`; prior versions are untouched.
 
-- **Text**: the client produces a CRDT update transforming the current doc into the restored content (so collaborators converge), encrypts it, submits via the relay/log, and snapshots the new head ([09 §9.6](09-realtime-collaboration.md)).
+- **Text**: the client computes the target text from the restored snapshot, **diffs it against the current Yrs doc text, and applies the minimal insert/delete ops as a single Yrs transaction** so collaborators converge. The resulting CRDT update is encrypted and submitted via the relay/log, then the new head is snapshotted ([09 §9.6](09-realtime-collaboration.md)). This is **best-effort textual, not structural** convergence.
 - **Ink/binary**: the client uploads the restored bytes as a new ciphertext head (`PUT /files/{id}/blob`), creating a new version.
 - Restores are audited server-side (structural only). UX confirms before restoring and explains it creates a new version (nothing is overwritten).
 

@@ -12,7 +12,7 @@ Three content forms, each with a distinct **view mode** and **edit mode**: markd
 ## 10.2 Markdown editor
 
 - **Edit mode**: a Compose text field over the CRDT-backed document. Local keystrokes apply to the Yrs doc → encrypted update → relay; inbound updates re-render. Provide a lightweight formatting toolbar (bold/italic/heading/list/link/code/checkbox) that inserts markdown syntax, and optional live inline styling.
-- **View mode**: rendered markdown via Markwon (`AndroidView`) or a Compose markdown renderer ([02 §2.2](02-tech-stack-and-libraries.md)) — headings, lists, tables, code blocks, task lists, links, images (images only when the referenced blob is available/decrypted). No remote network fetch from markdown content (privacy): only embedded/attached encrypted blobs render.
+- **View mode**: rendered markdown via Markwon (`AndroidView`) — chosen for v1.0.0; a Compose-native renderer is a later swap ([02 §2.2](02-tech-stack-and-libraries.md)) — headings, lists, tables, code blocks, task lists, links, images (images only when the referenced blob is available/decrypted). No remote network fetch from markdown content (privacy): only embedded/attached encrypted blobs render.
 - **Collaboration overlays**: remote carets/selections from awareness ([09 §9.7](09-realtime-collaboration.md)); presence chips in the app bar.
 - **Large documents**: virtualize rendering; debounce the markdown parse in view mode.
 
@@ -31,14 +31,14 @@ The differentiator. Goal: **low-latency, pressure/tilt-aware** handwriting that 
 
 ### Page model
 - A file is a sequence of **pages**; each page holds **strokes**. A stroke is a polyline of timestamped sample points `(x, y, pressure, tilt, orientation, t)` plus tool/brush attributes (color, base width, blend).
-- Editing operations: add stroke, erase stroke(s), move/transform selection, insert/delete page. v1.0.0 ink sync is **LWW per page/file** (not CRDT) — concurrent edits resolve by last-write-wins with both versions retained in history ([08 §8.5](08-sync-engine.md)).
+- Editing operations: add stroke, erase stroke(s), move/transform selection, insert/delete page. v1.0.0 ink sync is **LWW per page/file** (not CRDT) — concurrent edits resolve by last-write-wins with the loser retained as a sibling version in history. A per-file **version-vector** (`{ deviceId -> counter }`, incremented on each local committed ink edit) rides in encrypted `metadata_enc` and classifies edits as equal/ancestor/concurrent ([08 §8.5](08-sync-engine.md)).
 
 ### Rendering
 - Render committed strokes from the page model; render the in-progress stroke on the low-latency surface, then commit. Smooth/segment strokes (e.g. Catmull-Rom / the Ink engine's smoothing) for natural curves. Honor pressure/tilt in width/opacity.
 
 ## 10.5 Ink storage format (shared, versioned, encryptable)
 
-- Define a **Nyxite ink vector format** (`[P]`) — a compact, versioned, deterministic serialization (e.g. CBOR or a length-prefixed binary) of pages → strokes → samples + brush metadata. It must be **byte-stable** so the BLAKE3 content address is reproducible, and **shared with desktop** so an ink file drawn on Android opens on desktop and vice-versa ([master `docs/SPECIFICATION.md`](https://github.com/Nyxite/Nyxite)).
+- Define a **Nyxite ink vector format** — a compact, versioned, **deterministic CBOR** serialization (chosen; [19 §19.4](19-open-questions.md)) of pages → strokes → samples + brush metadata, with the exact field schema still **`[P]` pending desktop co-design**. It must be **byte-stable** so the BLAKE3 content address is reproducible, and **shared with desktop** so an ink file drawn on Android opens on desktop and vice-versa ([master `docs/SPECIFICATION.md`](https://github.com/Nyxite/Nyxite)).
 - The serialized page/file is **sealed with the FK** ([06 §6.3](06-cryptography.md)) and stored as an encrypted blob; the version-vector for LWW rides in encrypted `metadata_enc` ([04](04-local-data-model.md)).
 - The format carries a `version` for forward evolution (new brush types, recognition data later). Spec the format in its own document once the desktop team co-designs it; this client must conform exactly.
 - **Out of scope v1.0.0**: handwriting recognition / searchable ink text, Samsung `.sdoc` import (separate migration item) — but reserve a place in the format for recognized-text layers so ink can later feed the search index ([11](11-search.md)).
