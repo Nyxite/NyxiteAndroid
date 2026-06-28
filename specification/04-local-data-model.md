@@ -33,7 +33,7 @@ IDs are server-issued **UUIDv7** strings; created-on-device rows generate a UUID
 | `id` | TEXT PK | UUIDv7 |
 | `projectId`,`folderId?`,`ownerId` | TEXT | folder null = project root |
 | `name` | TEXT | decrypted file name |
-| `contentType` | TEXT | enum: `markdown`,`plaintext`,`ink`,`sourcecode`,`office`,`image` ([08](08-sync-engine.md)) — immutable |
+| `contentType` | TEXT | enum: `markdown`,`plaintext`,`ink`,`sourcecode`,`office`,`image`,`binary` ([08](08-sync-engine.md)) — immutable |
 | `syncPolicy` | TEXT | server-side policy enum: `server-default`,`excluded` only ([08 §8.2](08-sync-engine.md)). The server never sees `keepOnDevice` (offline pinning is the separate client-local field below). |
 | `keepOnDevice` | TEXT? | **client-local, per-device** offline-pinning setting: `keep`/`dontKeep`/null=`inherit` from folder/project ([16 §16.2](16-offline-and-storage-policies.md)); never sent to the server |
 | `currentVersionSeq` | INTEGER? | head pointer |

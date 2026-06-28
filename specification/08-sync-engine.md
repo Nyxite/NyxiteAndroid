@@ -8,7 +8,7 @@ Reconciles the device's local state ([04](04-local-data-model.md)) with the serv
 |---|---|---|---|
 | `markdown`, `plaintext`, `sourcecode` | 1 / 5 | **CRDT** (client-merged, Yrs) | Encrypted relay ([09](09-realtime-collaboration.md)) + REST `crdt/log` fallback |
 | `ink` | 3 | **LWW / version-vector** | `PUT/GET /files/{id}/blob` (ciphertext) |
-| `office`, `image` | 5 | **LWW / version-vector** | blob, chunked for large |
+| `office`, `image`, `binary` | 5 | **LWW / version-vector** | blob, chunked for large |
 
 `contentType` is immutable after creation and selects the decoder/editor and the sync path.
 

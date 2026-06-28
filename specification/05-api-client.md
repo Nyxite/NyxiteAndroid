@@ -31,11 +31,11 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET /projects/{id}/folders`
 - `POST/GET/PATCH/DELETE /folders`, `/folders/{id}` *(json, `nameEnc`,`parentFolderId`)*
 - `GET /folders/{id}/files`
-- `POST/GET/PATCH/DELETE /files`, `/files/{id}` *(json: `nameEnc`,`contentType`,`syncPolicy`,`crdtDocId`)* — `POST` includes the client-allocated `crdtDocId` (UUIDv7; required for text types, null otherwise). `contentType` is **immutable**: the client never `PATCH`es it. `syncPolicy` is the two-value enum `server-default`|`excluded` only.
+- `POST/GET/PATCH/DELETE /files`, `/files/{id}` *(json: `nameEnc`,`contentType`,`syncPolicy`,`parentFolderId`,`metadataEnc`,`crdtDocId`)* — `POST` sets `contentType` (**immutable**) and the client-allocated `crdtDocId` (UUIDv7; required for text types, null otherwise); `PATCH` updates **only** `nameEnc`, `syncPolicy`, `parentFolderId` (move), `metadataEnc`. `syncPolicy` is the two-value enum `server-default`|`excluded` only.
 
 ### FileContentApi
 - `GET /files/{id}/blob` *(ciphertext stream; supports `If-None-Match: <contentHash>`)*
-- `PUT /files/{id}/blob` *(ciphertext; ink/binary LWW)*
+- `PUT /files/{id}/blob` *(ciphertext; ink/binary LWW; `If-Match: <parentSeq>`)*
 - `GET /files/{id}/crdt/log?since={seq}` *(encrypted updates — REST fallback)*
 - `POST /files/{id}/crdt/log` *(submit encrypted update(s) — REST fallback)*
 - `GET /files/{id}/snapshot` *(latest encrypted snapshot pointer/stream)*
@@ -44,6 +44,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET /files/{id}/keys` *(caller's wrapped FK(s))*
 - `POST /files/{id}/keys` *(upload wrapped FK(s) for members)*
 - `POST /files/{id}/keys/rotate` *(register new generation: re-wrapped keys + new head ciphertext ref)*
+- `POST /files/keys:batch` *(subtree share fan-out: `{ grants: [ { fileId, keyId, memberId, wrappedKey } ] }`; idempotent, per-item partial success — see [13](13-sharing.md))*
 
 ### KeysDevicesRecoveryApi
 - `GET /keys/directory?userId=` | `?email=` *(public keys)*
