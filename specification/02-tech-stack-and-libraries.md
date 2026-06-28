@@ -61,7 +61,8 @@ The on-disk/on-wire **ink stroke format** is a Nyxite-defined, versioned, encryp
 | REST binding | **Retrofit** | Typed `/api/v1` surface ([05](05-api-client.md)). |
 | JSON | **kotlinx.serialization** | Matches Kotlin idioms; used for metadata DTOs (bodies are JSON for structure, binary for ciphertext). |
 | Realtime | **SignalR Java client** (`com.microsoft.signalr`) | The server's relay is SignalR `RelayHub` ([09](09-realtime-collaboration.md)); the official Java client runs on Android (RxJava-based). |
-| OIDC/auth | **AppAuth-Android** (`net.openid:appauth`) | Authorization Code + PKCE with Keycloak ([14](14-authentication.md)). |
+| Auth (native, default) | **Direct API** + **Credential Manager** (`androidx.credentials`) | Password+TOTP submitted to the Nyxite server over TLS, and passkeys (WebAuthn); the default login path ([14 §14.1](14-authentication.md)). |
+| OIDC/auth (enterprise option) | **AppAuth-Android** (`net.openid:appauth`) | Authorization Code + PKCE for the **enterprise Keycloak** tier only, resolving to the server's internal token; not used by native login ([14 §14.1](14-authentication.md)). |
 
 > SignalR note: the Java client depends on RxJava and uses its own JSON. Wrap it behind `RelayClient` and bridge RxJava `Single`/`Completable` to coroutines (`kotlinx-coroutines-rx3`). Validate early as part of the relay spike ([19](19-open-questions.md)).
 

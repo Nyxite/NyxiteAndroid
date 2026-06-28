@@ -76,7 +76,7 @@ Indexes: `projectId`, `folderId`, `ownerId`, `syncState`, `keepOnDevice`, `(keep
 `scope` (e.g. `project:{id}` or `global`) PK, `cursor` TEXT, `updatedAt`. Stores the opaque delta-sync cursor ([08 §8.3](08-sync-engine.md)).
 
 ### AccountEntity / SessionEntity
-The owning account of *this* database: `userId`, `keycloakSub`, `displayName`, `email`, `role`, `instanceHost`, token-expiry hints (tokens themselves are in secret storage, [14](14-authentication.md)). Because each account has its own DB, this is effectively a single row identifying the tenant; the cross-account list lives in the separate account registry ([§4.1](#41-storage-engine--at-rest-encryption)).
+The owning account of *this* database: `userId`, `subject` (the server's identity subject; on enterprise instances this is the Keycloak `sub`), `displayName`, `email`, `role`, `instanceHost`, token-expiry hints (tokens themselves are in secret storage, [14](14-authentication.md)). Because each account has its own DB, this is effectively a single row identifying the tenant; the cross-account list lives in the separate account registry ([§4.1](#41-storage-engine--at-rest-encryption)).
 
 ## 4.3 Full-text search (FTS5)
 

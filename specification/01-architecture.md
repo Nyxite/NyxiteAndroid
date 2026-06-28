@@ -77,7 +77,7 @@ Repository interfaces (`FileRepository`, `StructureRepository`, `KeyRepository`,
 | `CrdtEngine` | Apply/encode Yrs updates, state vectors, snapshots | ykt/Yrs ([09](09-realtime-collaboration.md)) |
 | `KeyStoreVault` | Wrap/unwrap the DB master key & identity-key store under a Keystore-held key | Android Keystore / StrongBox ([07](07-key-and-device-management.md)) |
 | `BlobCache` | Store/evict cached ciphertext and decrypted blobs (ink/binary) | App-private filesystem ([16](16-offline-and-storage-policies.md)) |
-| `AuthManager` | OIDC tokens, refresh, share-token minting | AppAuth ([14](14-authentication.md)) |
+| `AuthManager` | the server's access/refresh tokens (native login by default; AppAuth on the enterprise OIDC path), refresh, share-token minting | Credential Manager / direct API; AppAuth (enterprise) ([14](14-authentication.md)) |
 
 ## 1.6 Background work & threading
 
@@ -96,4 +96,4 @@ Repository interfaces (`FileRepository`, `StructureRepository`, `KeyRepository`,
 
 **Hilt** wires the graph. Scopes: `@Singleton` for stateless engines and process-wide infrastructure; `@ViewModelScoped` for per-screen state; and an **account-scoped component** (custom Hilt component keyed by `accountId`) for everything tenant-specific.
 
-Because the app is **multi-account from v1.0.0** ([14 §14.7](14-authentication.md)), per-account state must not leak across accounts. The account-scoped component owns that account's **`UserSession`** (the unlocked identity-key handle, created after login + key-unlock and cleared on lock/logout/switch), its OIDC tokens, its repositories, and its account-scoped data sources (the account's SQLCipher DB, `BlobCache` subtree, FTS index). The active account's component is created on switch-in and torn down — zeroizing in-memory key material — on switch-out. No use case can touch decrypted key material before unlock, and no account can read another's data. See [04 §4.2](04-local-data-model.md), [07](07-key-and-device-management.md), and [17](17-security.md).
+Because the app is **multi-account from v1.0.0** ([14 §14.7](14-authentication.md)), per-account state must not leak across accounts. The account-scoped component owns that account's **`UserSession`** (the unlocked identity-key handle, created after login + key-unlock and cleared on lock/logout/switch), its server tokens, its repositories, and its account-scoped data sources (the account's SQLCipher DB, `BlobCache` subtree, FTS index). The active account's component is created on switch-in and torn down — zeroizing in-memory key material — on switch-out. No use case can touch decrypted key material before unlock, and no account can read another's data. See [04 §4.2](04-local-data-model.md), [07](07-key-and-device-management.md), and [17](17-security.md).

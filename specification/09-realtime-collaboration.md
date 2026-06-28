@@ -12,7 +12,7 @@ Live multi-user editing of text documents over an **encrypted relay**: the serve
 ## 9.2 Transport
 
 - **SignalR over WebSocket**, single hub `RelayHub`, groups keyed `file:{fileId}`. Use the `com.microsoft.signalr` Java client wrapped behind `RelayClient`, bridging its RxJava API to coroutines/Flow.
-- **Upgrade auth**: OIDC bearer for users; a short-lived **share token** for guests ([14](14-authentication.md)). The token authorizes *relay access*; the **decryption key never comes from the server** (it is the user's unwrapped FK, or the guest's fragment key).
+- **Upgrade auth**: the server's access token (bearer) for users; a short-lived **share token** for guests ([14](14-authentication.md)). The token authorizes *relay access*; the **decryption key never comes from the server** (it is the user's unwrapped FK, or the guest's fragment key).
 - **Fallback**: when the socket is unavailable, use the REST encrypted-update endpoints ([08 §8.4](08-sync-engine.md)).
 
 ## 9.3 Hub contract (client side)
@@ -55,7 +55,7 @@ The server can't compact an encrypted log. **The client periodically snapshots**
 ## 9.7 Awareness & presence
 
 - **Awareness** (cursor, selection, display label/color) is **encrypted** with the FK and relayed via `SubmitAwareness`/`OnAwareness`; **never persisted**. Rendered as remote carets/selections in the editor ([10](10-editors.md)).
-- **Presence roster** (`OnPresence`) shows who is in the room by account display name (from Keycloak) or "guest"; no content. Rendered as avatar chips.
+- **Presence roster** (`OnPresence`) shows who is in the room by account display name (from the user's account) or "guest"; no content. Rendered as avatar chips.
 - Throttle awareness emission (e.g. on cursor move, coalesced ~20–30 Hz max) to limit traffic and battery.
 
 ## 9.8 Guest mode (this device joining a link share)
@@ -64,7 +64,7 @@ The server can't compact an encrypted log. **The client periodically snapshots**
 - `GET /share/{token}` bootstraps; the relay socket connects at `/share/{token}/ws` with a short-lived share session token authorizing relay access only.
 - The FK comes from the fragment; the client decrypts/edits exactly as a member would.
 - Read-only links: the client receives `OnUpdate`/`OnAwareness` but is rejected on `SubmitUpdate` — the editor enters view-only mode. Guest-authored updates store `author_id = null` server-side.
-- A guest has no Keycloak account; the app runs in a constrained "guest session" without the full key/device subsystem.
+- A guest has no Nyxite account; the app runs in a constrained "guest session" without the full key/device subsystem.
 - **Guest storage model**: a guest runs **without the per-account SQLCipher DB**. Guest content is held in an **ephemeral in-memory cache only** and is **never written to any account database or `noBackup` files**; decrypted views are transient and discarded when the guest session ends ([14 §14.5](14-authentication.md)).
 
 ## 9.9 Reconnection & lifecycle

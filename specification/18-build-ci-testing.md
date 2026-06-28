@@ -9,7 +9,7 @@
 
 ## 18.2 Configuration
 
-- Instance host (API base, OIDC authority, public-share base) configurable via build config + runtime settings ([05](05-api-client.md),[14](14-authentication.md)); default `nyxite.app`. No secrets in the APK beyond the OIDC public client id (PKCE, no client secret on device).
+- Instance host (API base, public-share base, plus the OIDC authority on enterprise instances) configurable via build config + runtime settings ([05](05-api-client.md),[14](14-authentication.md)); default `nyxite.app`. No secrets in the APK; on enterprise instances the only embedded value is the OIDC public client id (PKCE, no client secret on device).
 
 ## 18.3 Module build hygiene
 

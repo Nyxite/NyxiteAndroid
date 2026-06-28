@@ -134,7 +134,7 @@ These track the **server's canonical ledger**; the client must match each exactl
 **Recommendation**
 
 - **Distribute via Play Store *and* signed direct APK** — the server is self-hosted, so some users sideload to reach a private instance ([18 §18.4](18-build-ci-testing.md)).
-- **Instance configuration**: a setup screen takes a base host; the app derives API base (`/api/v1`), OIDC authority, and public-share base from it (overridable for non-standard layouts). Since multi-account is in v1.0.0 ([14 §14.7](14-authentication.md)), **each account stores its own instance host**, enabling personal + shared instances side by side.
+- **Instance configuration**: a setup screen takes a base host; the app derives API base (`/api/v1`) and public-share base from it (plus the OIDC authority on enterprise instances; overridable for non-standard layouts). Since multi-account is in v1.0.0 ([14 §14.7](14-authentication.md)), **each account stores its own instance host**, enabling personal + shared instances side by side.
 - Document the Cloudflare Origin CA caveat only for admins hitting origin directly ([05 §5.1](05-api-client.md)); normal users go through the public `nyxite.app` chain.
 
 ---

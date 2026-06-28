@@ -36,7 +36,7 @@ The client-side burden is real and deliberate: search and offline reach are boun
 | 11 | [search.md](11-search.md) | On-device FTS over the local subset; indexing lifecycle |
 | 12 | [version-history.md](12-version-history.md) | Snapshot fetch, client-side diff, restore |
 | 13 | [sharing.md](13-sharing.md) | Account shares (HPKE), link shares (URL fragment), revocation |
-| 14 | [authentication.md](14-authentication.md) | Keycloak OIDC + PKCE + TOTP, token storage, refresh |
+| 14 | [authentication.md](14-authentication.md) | Native auth (password+TOTP, passkeys) by default; enterprise Keycloak/OIDC+PKCE pluggable; token storage, refresh |
 | 15 | [ui-and-navigation.md](15-ui-and-navigation.md) | Screens, navigation graph, Compose/Material 3, accessibility |
 | 16 | [offline-and-storage-policies.md](16-offline-and-storage-policies.md) | User-driven keep-on-device (file/folder/project), convenience cache, excluded, battery/network constraints |
 | 17 | [security.md](17-security.md) | Threat model on device, at-rest protection, screenshots, biometrics |

@@ -27,7 +27,7 @@ The Keystore key is the on-device root of trust: it is generated in hardware, ne
 ## 7.3 Device enrollment
 
 ### First device / first sign-in
-1. User authenticates with Keycloak (OIDC + TOTP) → access token ([14](14-authentication.md)).
+1. User authenticates with the Nyxite server (native password+TOTP or passkey by default; enterprise Keycloak OIDC optional) → access token ([14](14-authentication.md)).
 2. App checks the key directory (`GET /keys/directory?userId=me`): if the user has **no identity keypair yet** (brand-new account), generate X25519 + Ed25519, store privates in the Keystore-wrapped identity store, and **publish publics** via `PUT /keys`.
 3. Generate a **device keypair**; register the device via `POST /devices { label, pubkey }` → `{ deviceId, status: "pending", pairingCode, qrPayload }`.
 4. Generate the **recovery key** and escrow ([§7.4](#74-recovery-key)). Force the user through the recovery-key flow before completing setup.

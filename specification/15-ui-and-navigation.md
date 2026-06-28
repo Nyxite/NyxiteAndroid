@@ -6,7 +6,7 @@ Jetpack Compose + Material 3, adaptive for phone/tablet/foldable, with the ink e
 
 Type-safe Navigation-Compose with `@Serializable` routes. Top-level destinations:
 
-- `AuthGraph` — `Login`, `TotpStep` (delegated to Keycloak Custom Tab), `DeviceEnroll`, `DeviceApprove`, `RecoverySetup`, `RecoveryRestore`.
+- `AuthGraph` — `Login` (native password/passkey by default, with enterprise SSO as an optional path), `TotpStep` (native TOTP entry; delegated to the Keycloak Custom Tab on enterprise instances), `DeviceEnroll`, `DeviceApprove`, `RecoverySetup`, `RecoveryRestore`.
 - `BrowseGraph` — `Projects`, `ProjectDetail(projectId)`, `Folder(folderId)` (file/folder list), `Search`.
 - `EditorGraph` — `TextEditor(fileId)`, `InkEditor(fileId)` (chosen by `contentType`).
 - `HistoryGraph` — `Versions(fileId)`, `DiffViewer(fileId, fromSeq, toSeq)`.
@@ -15,7 +15,7 @@ Type-safe Navigation-Compose with `@Serializable` routes. Top-level destinations
 
 **Account switcher**: because the app is **multi-account from v1.0.0** ([14 §14.7](14-authentication.md)), a persistent account switcher (in the top app bar / nav drawer header) shows the active account and lets the user switch or add one. Switching re-roots `BrowseGraph` to the newly active account's data and tears down the prior account's in-memory session ([01 §1.8](01-architecture.md)).
 
-**Deep links**: `https://nyxite.app/share/{token}` (App Links) → `OpenLink`, with the `#k=` fragment parsed locally ([13](13-sharing.md)). OIDC redirect URI handled by AppAuth.
+**Deep links**: `https://nyxite.app/share/{token}` (App Links) → `OpenLink`, with the `#k=` fragment parsed locally ([13](13-sharing.md)). On enterprise instances, the OIDC redirect URI is handled by AppAuth.
 
 **Adaptive**: on `Expanded`/`Medium` width, use a list-detail scaffold (browse list + open file in the detail pane); on `Compact`, single-pane with back navigation. Predictive back supported.
 

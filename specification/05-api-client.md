@@ -4,8 +4,8 @@ Implements the server REST surface ([server 04](https://github.com/Nyxite/server
 
 ## 5.1 Configuration
 
-- **Base URL**: `https://{host}/api/v1` — configurable (the instance host; default `nyxite.app`). The OIDC authority, API base, and public-share base are all configurable at build/runtime ([14](14-authentication.md)).
-- **Auth**: `Authorization: Bearer <OIDC access token>` on all `/api/v1/**` except public share endpoints. Guests use a short-lived **share token** ([14](14-authentication.md)). **Token lifetimes** (match server): access token ~5 min; guest share-session token 15 min (renewable); relay socket ticket single-use, 60 s.
+- **Base URL**: `https://{host}/api/v1` — configurable (the instance host; default `nyxite.app`). The API base and public-share base (plus the OIDC authority on enterprise instances) are all configurable at build/runtime ([14](14-authentication.md)).
+- **Auth**: `Authorization: Bearer <the server's access token>` on all `/api/v1/**` except public share endpoints. The token is issued by the Nyxite server regardless of login method (native or enterprise OIDC) ([14 §14.1](14-authentication.md)). Guests use a short-lived **share token** ([14](14-authentication.md)). **Token lifetimes** (match server): access token ~5 min; guest share-session token 15 min (renewable); relay socket ticket single-use, 60 s.
 - **IDs** UUIDv7; **timestamps** RFC 3339 UTC.
 - **Pagination**: cursor-based — `?cursor=<opaque>&limit=<n>` (default `50`, max `200`); responses are `{ items, nextCursor }`. The cursor is an **opaque base64url** token, persisted as-is (`SyncCursorEntity.cursor`) and **never parsed** by the client.
 - **Idempotency**: `Idempotency-Key` on POST creates; keys are **(user, endpoint)-scoped for 24 h**. A replay with the same key returns the original response; a mismatched body with the same key returns `409 idempotency_conflict`.

@@ -31,7 +31,7 @@ The server gives it: authenticated transport, durable ordered storage of ciphert
 
 v1.0.0 is the **complete E2EE Android client** spanning Phases 0–6 of the master roadmap, built in the same phase order as the server (see [20-roadmap.md](20-roadmap.md)). The key/device/recovery subsystem is foundational (Phase 0) and is never retrofitted later.
 
-Explicitly **in scope**: markdown + plaintext + ink editing, the server sync policies (`server-default`/`excluded`) plus client-local keep-on-device, encrypted relay collaboration with guests, account + link sharing, rotation-based revocation, version history with client diffs/restore, on-device search, Keycloak login with TOTP, device enrollment and recovery-key flows, on-device key storage in the Android Keystore/StrongBox, and **multiple accounts / instance switching** (per-account isolated storage and keys, [14 §14.7](14-authentication.md)).
+Explicitly **in scope**: markdown + plaintext + ink editing, the server sync policies (`server-default`/`excluded`) plus client-local keep-on-device, encrypted relay collaboration with guests, account + link sharing, rotation-based revocation, version history with client diffs/restore, on-device search, native authentication (password+TOTP or passkeys) with enterprise Keycloak/OIDC as a pluggable option, device enrollment and recovery-key flows, on-device key storage in the Android Keystore/StrongBox, and **multiple accounts / instance switching** (per-account isolated storage and keys, [14 §14.7](14-authentication.md)).
 
 Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 and the separate migration item): office-document and source-code content types, image attachments, chunked upload for very large binaries, key-transparency/safety-number verification, metadata-graph hiding, and Samsung Notes `.sdoc` import. These are noted where they touch the architecture so seams exist for them.
 
@@ -50,11 +50,11 @@ Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 an
 
 | Actor | On Android |
 |-------|-----------|
-| **User** | Signs in via Keycloak (OIDC + TOTP), enrolls the device, holds the identity keypair, owns/edits/shares files. |
-| **Guest** | This device acting on a link share: no Keycloak account, file key taken from the URL fragment, relay access via a short-lived share token. The app can both *open* an incoming link and *create* link shares. |
+| **User** | Signs in to the Nyxite server (native password+TOTP or passkey by default; enterprise Keycloak/OIDC optional), enrolls the device, holds the identity keypair, owns/edits/shares files. |
+| **Guest** | This device acting on a link share: no Nyxite account, file key taken from the URL fragment, relay access via a short-lived share token. The app can both *open* an incoming link and *create* link shares. |
 | **Peer** | Another user/guest editing the same document; seen through presence/awareness over the relay. |
 | **Server** | Blind relay/store. The client treats every byte it sends as ciphertext the server cannot read. |
-| **Keycloak** | External IdP for account auth and TOTP. |
+| **Keycloak** | Optional **enterprise** external IdP (OIDC SSO); not the default — native auth is server-owned. |
 
 ## 0.6 Glossary (client-facing)
 
@@ -74,7 +74,7 @@ Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 an
 
 | Phase | Android deliverable |
 |-------|---------------------|
-| 0 | App shell, Keycloak login + TOTP, device enrollment, identity keys in Keystore, recovery-key UX, structure browsing with encrypted names, local encrypted DB. |
+| 0 | App shell, native login (password+TOTP, passkeys) with enterprise Keycloak/OIDC pluggable, device enrollment, identity keys in Keystore, recovery-key UX, structure browsing with encrypted names, local encrypted DB. |
 | 1 | Markdown + plaintext editing on the encrypted CRDT (single user offline-first), blob sync, server sync policies (server-default/excluded) + client-local keep-on-device, on-demand download, view/edit modes, on-device search. |
 | 2 | Live relay collaboration (client-side merge), account + link sharing, guest mode, rotation-based revocation, version history with client diffs + restore. |
 | 3 | S-Pen ink capture + vector stroke format, LWW/version-vector ink sync (encrypted blobs). |
