@@ -16,7 +16,7 @@ NyxiteAndroid/
 │   ├── core-model/                    # pure Kotlin domain entities, enums, value types (no Android)
 │   ├── core-common/                   # Result types, DispatcherProvider, time, base64url, logging facade
 │   ├── core-crypto/                   # CryptoEngine API + Tink/BLAKE3/Argon2 impl; framing; addressing
-│   ├── core-crdt/                     # CrdtEngine API + ykt/Yrs impl; snapshots, state vectors
+│   ├── core-crdt/                     # CrdtEngine API + yrs (UniFFI) impl; snapshots, state vectors
 │   ├── core-keystore/                 # KeyStoreVault: Android Keystore/StrongBox wrapping
 │   ├── core-database/                 # Room + SQLCipher: entities, DAOs, FTS, migrations
 │   ├── core-network/                  # OkHttp/Retrofit ApiClient, SignalR RelayClient, DTOs (ciphertext-only)
@@ -64,7 +64,7 @@ Application ID: `app.nyxite.android` (release). Debug/internal builds use a suff
 ## 3.3 Naming conventions (code)
 
 - Match the master `docs/NAMING.md`: product is **Nyxite**; primary domain `nyxite.app`.
-- Classes: `PascalCase`; the public API of each `core-*` engine is an interface (`CryptoEngine`, `CrdtEngine`, `RelayClient`) with an impl named `*Impl` or `Tink*`/`Ykt*`/`SignalR*` to signal the backing tech.
+- Classes: `PascalCase`; the public API of each `core-*` engine is an interface (`CryptoEngine`, `CrdtEngine`, `RelayClient`) with an impl named `*Impl` or `Tink*`/`Yrs*`/`SignalR*` to signal the backing tech.
 - Use cases: verb-first (`OpenFileForEdit`), `operator fun invoke`.
 - DTOs (network): suffix `Dto`; map to/from domain entities in `data-*` mappers — DTOs never escape `core-network`/`data-*`.
 - Room entities: suffix `Entity`; never exposed above the data layer.

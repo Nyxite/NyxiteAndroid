@@ -1,10 +1,10 @@
 # 09 — Real-time Collaboration
 
-Live multi-user editing of text documents over an **encrypted relay**: the server stores and forwards encrypted CRDT updates but never merges or reads them; **the Android client runs the Yrs engine (ykt) and merges locally** ([server 05](https://github.com/Nyxite/server)). This is the single highest-risk client subsystem (the ykt binding) and must be spiked first ([19](19-open-questions.md)).
+Live multi-user editing of text documents over an **encrypted relay**: the server stores and forwards encrypted CRDT updates but never merges or reads them; **the Android client runs the Yrs engine (yrs via UniFFI) and merges locally** ([server 05](https://github.com/Nyxite/server)). The engine is the reference Rust `yrs`/`yffi` core wrapped by UniFFI-generated Kotlin bindings; a short UniFFI integration + conformance spike validates it ([19](19-open-questions.md)).
 
 ## 9.1 Components
 
-- **`CrdtEngine`** (`core-crdt`, ykt/Yrs): holds the per-document Yrs doc, applies/encodes updates, computes state vectors, serializes snapshots.
+- **`CrdtEngine`** (`core-crdt`, yrs via UniFFI): holds the per-document Yrs doc, applies/encodes updates, computes state vectors, serializes snapshots.
 - **`RelayClient`** (`core-network`, SignalR): connects to the `RelayHub`, joins per-document rooms, submits/receives **encrypted** updates and awareness, manages reconnection. Speaks ciphertext only.
 - **`CollabRepository`** (`data-collab`): orchestrates join → bootstrap → live loop → snapshot → leave, bridging CryptoEngine ⇄ CrdtEngine ⇄ RelayClient.
 - **`CollabService`** (foreground service): keeps the connection alive during active editing.
@@ -75,4 +75,4 @@ The server can't compact an encrypted log. **The client periodically snapshots**
 
 ## 9.10 Wire-protocol conformance (critical)
 
-Text edited on Android must merge identically on web (Yjs) and desktop (ydotnet). The client ships a **`CrdtConformance` test suite** that replays the shared Yrs wire-protocol vectors and asserts identical merged state and identical encoded updates across bindings ([18 §18.5](18-build-ci-testing.md)). If ykt fails interop or is too immature, fall back to a JNI/UniFFI wrapper over `yffi` — decide during the Phase-1 spike ([19](19-open-questions.md)).
+Text edited on Android must merge identically on web (Yjs) and desktop (ydotnet). The client ships a **`CrdtConformance` test suite** that replays the shared Yrs wire-protocol vectors and asserts identical merged state and identical encoded updates across bindings ([18 §18.5](18-build-ci-testing.md)). Android runs the reference Rust `yrs`/`yffi` core through UniFFI-generated Kotlin bindings, so it merges against the same core the ecosystem uses; a short UniFFI integration + conformance spike confirms interop during Phase 1 ([19](19-open-questions.md)).

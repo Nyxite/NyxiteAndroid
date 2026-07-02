@@ -24,7 +24,7 @@ It follows a **Clean-architecture layering** with a **unidirectional data flow (
 │   • ApiClient (Retrofit/OkHttp)   ← REST over ciphertext          │
 │   • RelayClient (SignalR)         ← encrypted CRDT relay          │
 │   • CryptoEngine (Tink + BLAKE3 + Argon2) ← all encryption        │
-│   • CrdtEngine (ykt/Yrs)          ← text merge                    │
+│   • CrdtEngine (yrs via UniFFI)   ← text merge                    │
 │   • KeyStoreVault (Android Keystore/StrongBox) ← key material     │
 │   • BlobCache (filesystem)        ← cached ciphertext/plaintext   │
 └──────────────────────────────────────────────────────────────────┘
@@ -74,7 +74,7 @@ Repository interfaces (`FileRepository`, `StructureRepository`, `KeyRepository`,
 | `ApiClient` | Typed REST over `/api/v1`, ciphertext bodies, problem+json errors, idempotency | Retrofit + OkHttp + kotlinx.serialization ([05](05-api-client.md)) |
 | `RelayClient` | SignalR `RelayHub` connection, join/submit/awareness, reconnect | microsoft-signalr Java client ([09](09-realtime-collaboration.md)) |
 | `CryptoEngine` | seal/open framed objects, HPKE wrap/unwrap, sign/verify, content address, recovery KDF | Tink + BLAKE3 + Argon2 ([06](06-cryptography.md)) |
-| `CrdtEngine` | Apply/encode Yrs updates, state vectors, snapshots | ykt/Yrs ([09](09-realtime-collaboration.md)) |
+| `CrdtEngine` | Apply/encode Yrs updates, state vectors, snapshots | yrs via UniFFI ([09](09-realtime-collaboration.md)) |
 | `KeyStoreVault` | Wrap/unwrap the DB master key & identity-key store under a Keystore-held key | Android Keystore / StrongBox ([07](07-key-and-device-management.md)) |
 | `BlobCache` | Store/evict cached ciphertext and decrypted blobs (ink/binary) | App-private filesystem ([16](16-offline-and-storage-policies.md)) |
 | `AuthManager` | the server's access/refresh tokens (native login by default; AppAuth on the enterprise OIDC path), refresh, share-token minting | Credential Manager / direct API; AppAuth (enterprise) ([14](14-authentication.md)) |

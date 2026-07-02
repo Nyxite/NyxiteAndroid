@@ -2,7 +2,7 @@
 
 Phase order mirrors the server ([server 15](https://github.com/Nyxite/server)) so the client and backend land each capability together. v1.0.0 is the complete E2EE client (Phases 0–6); phases are build order, not separate products. **E2EE is foundational from Phase 0** and never retrofitted.
 
-Before Phase 1 logic is committed, run the **early spikes** ([18 §18.8](18-build-ci-testing.md)): ykt interop, Tink HPKE suite match, SignalR-on-Android, ink latency, Argon2id params.
+Before Phase 1 logic is committed, run the **early spikes** ([18 §18.8](18-build-ci-testing.md)): yrs (UniFFI) integration + conformance, Tink HPKE suite match, SignalR-on-Android, ink latency, Argon2id params.
 
 ## Phase 0 — Foundations
 **Deliver**: app shell + navigation; **account-scoped DI + per-account SQLCipher DB/keys/cache** as the multi-account foundation ([01 §1.8](01-architecture.md),[04 §4.1](04-local-data-model.md),[14 §14.7](14-authentication.md)); native authentication (password+TOTP, passkeys) with enterprise Keycloak/OIDC + PKCE pluggable ([14](14-authentication.md)); identity keypair generation + device enrollment + recovery-key flow ([07](07-key-and-device-management.md)); key directory publish/lookup; Keystore/StrongBox + SQLCipher DB ([04](04-local-data-model.md),[17](17-security.md)); structure CRUD with **encrypted names** decrypted on-device ([05](05-api-client.md)); crypto engine with conformance vectors ([06](06-cryptography.md)).

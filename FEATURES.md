@@ -22,7 +22,7 @@ Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt a
 
 ## Collaboration
 
-- Live collaborative editing — **client-side CRDT merge** (ykt / Yrs); the server is a blind **encrypted relay**
+- Live collaborative editing — **client-side CRDT merge** (yrs via UniFFI); the server is a blind **encrypted relay**
 - Guest/link participation uses the file key from the share-link URL fragment
 
 ## Search
@@ -50,7 +50,7 @@ Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt a
 
 See [../docs/OPEN-DECISIONS.md](../docs/OPEN-DECISIONS.md). Android-specific:
 
-- ykt binding maturity — validate early; it is the least battle-tested of the three CRDT bindings (and now runs the merge client-side)
+- yrs (UniFFI) binding — the Android CRDT engine wraps the reference Rust `yrs`/`yffi` core via UniFFI-generated Kotlin bindings; validate with a short integration + conformance spike (the previously-planned standalone Kotlin binding was dropped as officially inactive)
 - On-device key storage (Android Keystore / StrongBox), device enrollment UX, and recovery-phrase entry/unwrap handling on mobile
 - Ink capture (S-Pen pressure/tilt) and encrypted storage-format parity with desktop
 - Client-local pin and client-side indexing behavior under mobile storage and battery constraints

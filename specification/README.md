@@ -31,7 +31,7 @@ The client-side burden is real and deliberate: search and offline reach are boun
 | 06 | [cryptography.md](06-cryptography.md) | AEAD, HPKE, Ed25519/X25519, BLAKE3, Argon2id, framing, Tink mapping |
 | 07 | [key-and-device-management.md](07-key-and-device-management.md) | Identity keypair, device enrollment, recovery key, Keystore/StrongBox |
 | 08 | [sync-engine.md](08-sync-engine.md) | Manifest/delta sync, policies, CRDT/LWW split, WorkManager |
-| 09 | [realtime-collaboration.md](09-realtime-collaboration.md) | SignalR relay, ykt/Yrs merge, awareness, guests, snapshots |
+| 09 | [realtime-collaboration.md](09-realtime-collaboration.md) | SignalR relay, yrs (UniFFI) merge, awareness, guests, snapshots |
 | 10 | [editors.md](10-editors.md) | Markdown, plaintext, and S-Pen ink editors; view/edit modes |
 | 11 | [search.md](11-search.md) | On-device FTS over the local subset; indexing lifecycle |
 | 12 | [version-history.md](12-version-history.md) | Snapshot fetch, client-side diff, restore |

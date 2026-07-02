@@ -84,7 +84,7 @@ All primitives must match the server's algorithm table ([server 07 §7.3](https:
 
 | Concern | Choice | Risk |
 |---------|--------|------|
-| Text CRDT | **ykt / Yrs Kotlin binding** | The **highest-risk dependency.** It is the least battle-tested of the three Yrs bindings (Yjs web, ydotnet desktop), and now runs the full merge client-side. **Spike it before committing the architecture** — validate wire-protocol interop with Yjs/ydotnet via the shared conformance vectors ([09 §9.7](09-realtime-collaboration.md), [18](18-build-ci-testing.md), [19](19-open-questions.md)). Have a fallback plan (own JNI binding over `yffi`, or a thin Rust UniFFI wrapper) if the binding is inadequate. |
+| Text CRDT | **yrs (UniFFI-generated Kotlin bindings)** | Android wraps the **reference Rust `yrs`/`yffi` core** (the same core desktop's ydotnet builds on) through **Mozilla UniFFI** — generated Kotlin bindings, no hand-written unsafe JNI glue, Kotlin-Multiplatform-capable. Using the reference core keeps binding-maturity risk low (the previously-planned standalone Kotlin binding was dropped as officially inactive). Cost: the UniFFI/JNA runtime + codegen. A **short integration + conformance-vector spike** validates wire-protocol interop with Yjs/ydotnet ([09 §9.7](09-realtime-collaboration.md), [18](18-build-ci-testing.md), [19](19-open-questions.md)). |
 
 ## 2.9 Observability & quality
 

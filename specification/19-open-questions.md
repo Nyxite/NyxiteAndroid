@@ -10,7 +10,7 @@ This document analyzes each Android-specific open item and gives a **recommended
 | Multi-account | **Yes, from v1.0.0** — per-account isolated DB/keys/store/index; instance switching | [14 §14.7](14-authentication.md), [01 §1.8](01-architecture.md), [04 §4.1](04-local-data-model.md), [15 §15.1](15-ui-and-navigation.md), [16 §16.1](16-offline-and-storage-policies.md), [17 §17.2](17-security.md) |
 | Application ID / root package | **`app.nyxite.android`** | [03 §3.2](03-project-structure.md) |
 | Local storage model | **User-driven keep-on-device** (file/folder/project, cascading); no auto-budgeted cache; **no plaintext export on Android** (desktop feature) | [16](16-offline-and-storage-policies.md), [04 §4.2](04-local-data-model.md), [08 §8.2](08-sync-engine.md), [11](11-search.md), [15 §15.2](15-ui-and-navigation.md) |
-| Text CRDT engine | **ykt**, with a **yffi wrapper as the agreed dev-time backup** if the spike fails | [09 §9.10](09-realtime-collaboration.md), [§19.1](#191-ykt--crdt-binding-maturity--needs-a-spike-clear-fallback) |
+| Text CRDT engine | **yrs via UniFFI-generated Kotlin bindings** (previously-planned standalone Kotlin binding dropped — officially inactive, 0 releases) | [09 §9.10](09-realtime-collaboration.md), [§19.1](#191-android-crdt-binding--decided-uniffi-over-yrs) |
 | Key lock model | **Biometric/credential with a 10-min validity window** (configurable); StrongBox when present; device-to-device approval via **QR + numeric code**; **BIP39 24-word** recovery phrase | [07](07-key-and-device-management.md), [§19.2](#192-on-device-key-storage-lock-model--enrollment-ux--recommend-a-concrete-model) |
 | Argon2id params | **m = 64 MiB, t = 3, p = 1** (tune on hardware; store in `kdf_params`) | [06 §6.8](06-cryptography.md), [07 §7.4](07-key-and-device-management.md) |
 | Realtime client | **Official `com.microsoft.signalr` Java client** + RxJava→coroutines bridge | [09 §9.2](09-realtime-collaboration.md), [§19.7](#197-signalr-on-android--recommend-official-client-pre-planned-fallback) |
@@ -19,21 +19,17 @@ This document analyzes each Android-specific open item and gives a **recommended
 
 ---
 
-## 19.1 ykt / CRDT binding maturity — *needs a spike; clear fallback*
+## 19.1 Android CRDT binding — *DECIDED (UniFFI over yrs)*
 
-**Risk**: ykt is the least battle-tested Yrs binding and now carries the entire client-side merge ([09 §9.10](09-realtime-collaboration.md)). This is the top schedule risk.
+**Decision**: Android's text CRDT binding is **UniFFI-generated Kotlin bindings over the reference Rust `yrs`/`yffi` core** (via Mozilla UniFFI). The previously-planned standalone Kotlin binding is **dropped** because it is officially inactive (its upstream repo directs readers to `y-uniffi`; 0 releases). Rather than depend on an immature standalone binding, Android wraps the **same reference `yrs`/`yffi` core** the rest of the ecosystem (including desktop's ydotnet) already depends on, but through UniFFI — generated Kotlin bindings, no hand-written unsafe JNI glue, and Kotlin-Multiplatform-capable. The `CrdtEngine` interface is unchanged, so the rest of the app is insulated.
 
-**Recommendation**: run a **time-boxed spike (≤1 week) before any Phase-1 text-editing code is committed**, with a hard go/no-go gate.
+**Rationale**: using the reference core removes the binding-maturity risk that motivated the old go/no-go gate; Android is no longer the highest-risk client subsystem. Cost: the UniFFI/JNA runtime + codegen are added to the Android build.
 
-**How to fix / validate**
-1. Add a `core-crdt` spike module. Pull the shared Yrs wire-protocol conformance vectors ([18 §18.6](18-build-ci-testing.md)).
+**Remaining validation — short UniFFI integration + conformance-vector spike** (replaces the retired ≤1-week standalone-binding go/no-go gate)
+1. Add a `core-crdt` module wiring the UniFFI-generated Kotlin bindings over `yrs`/`yffi`. Pull the shared Yrs wire-protocol conformance vectors ([18 §18.6](18-build-ci-testing.md)).
 2. Assert: (a) byte-identical merged state vs. Yjs/ydotnet on the vectors; (b) byte-identical *encoded updates* for the same edit sequence; (c) state-vector reconstruction from snapshot + log matches.
 3. Benchmark on a mid-range device: large doc (e.g. 200k chars), high-frequency edits (sustained typing + remote updates), memory ceiling.
-4. Confirm packaging: NDK ABIs (`arm64-v8a`, `x86_64` for emulators), APK size impact, init cost.
-
-**Fallback (pre-planned)**: if ykt fails interop or perf, build a thin **UniFFI (or JNI) wrapper over `yffi`** (the canonical Rust `y-crdt` FFI) exposing exactly the `CrdtEngine` surface ([09 §9.1](09-realtime-collaboration.md)). This is more work but removes binding-maturity risk by using the reference implementation. Budget for it as a contingency in the Phase-1 estimate.
-
-**Decision gate**: ykt passes → use it; otherwise → yffi wrapper. Either way the `CrdtEngine` interface is unchanged, so the rest of the app is insulated.
+4. Confirm packaging: NDK ABIs (`arm64-v8a`, `x86_64` for emulators), UniFFI/JNA runtime + APK size impact, init cost.
 
 ---
 
@@ -143,7 +139,7 @@ These track the **server's canonical ledger**; the client must match each exactl
 
 | # | Item | Decided | Remaining work | Owner | Gate |
 |---|------|---------|----------------|-------|------|
-| 19.1 | CRDT engine | ykt; yffi backup | Validation spike (interop + perf) | Android | Before Phase 1 text editing |
+| 19.1 | CRDT engine | **Decided**: yrs via UniFFI-generated Kotlin bindings (standalone binding dropped) | Short UniFFI integration + conformance spike | Android | Before Phase 1 text editing |
 | 19.2 | Key/lock/enrollment | 10-min window; QR+code; BIP39-24 | Hardware spike (StrongBox/biometric across OEMs) | Android | Phase 0 |
 | 19.3 | Argon2id params | m=64 MiB, t=3, p=1 | Tune on device trio | Android | Phase 0 |
 | 19.4 | Ink format | Deterministic CBOR | Joint desktop spec + round-trip tests | Android + Desktop | Before Phase 3 |

@@ -20,7 +20,7 @@ Because Nyxite is zero-knowledge, the Android app carries responsibilities a typ
 
 - It **generates and holds the user's keys**; it performs **all** AES-256-GCM encryption/decryption and HPKE wrap/unwrap locally.
 - It **computes content addresses** (BLAKE3 of plaintext) itself; the server stores the ciphertext under the client-supplied address and cannot verify it.
-- It **runs the CRDT engine** (ykt/Yrs) and merges locally; the server never merges.
+- It **runs the CRDT engine** (yrs via UniFFI) and merges locally; the server never merges.
 - It **builds and queries its own full-text search index**; there is no server search.
 - It **computes diffs** between decrypted snapshots; there is no server diff.
 - It **drives key rotation** on share revocation for forward secrecy.
@@ -68,7 +68,7 @@ Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 an
 - **Encrypted frame** — the on-the-wire/at-rest container: `magic(4)|version(1)|key_id(16)|nonce(12)|ciphertext|tag(16)` with AAD binding `file_id` + object kind ([06](06-cryptography.md)).
 - **Key generation** — integer that bumps on FK rotation; clients must use the current generation.
 - **Sync policy** — per-file server policy: `server-default` | `excluded`. (Offline pinning is the separate **client-local** `keepOnDevice` field, never sent to the server — [16 §16.2](16-offline-and-storage-policies.md).)
-- **CRDT / Yrs / ykt** — the Yjs-family CRDT; `ykt` is the Kotlin binding the client uses to merge text documents.
+- **CRDT / Yrs / UniFFI** — the Yjs-family CRDT; the Android client merges text documents through **UniFFI-generated Kotlin bindings over the reference Rust `yrs`/`yffi` core**.
 
 ## 0.7 Phase map (Android)
 

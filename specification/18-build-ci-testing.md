@@ -27,7 +27,7 @@
 | Layer | Tools | Focus |
 |-------|-------|-------|
 | **Crypto conformance** | JUnit + shared KAT/cross-client vectors | **AES-GCM framing, HPKE wrap/unwrap, Ed25519, X25519, BLAKE3, Argon2id** must interop byte-for-byte with server/desktop/web. Wrap on Android → unwrap on server impl and vice-versa. **Highest priority.** ([06 §6.9](06-cryptography.md)) |
-| **CRDT conformance** | JUnit + shared Yrs wire vectors | ykt must produce identical merged state and encoded updates vs Yjs/ydotnet. Mirrors server `CrdtConformanceTests`. **Validate before committing to ykt.** ([09 §9.10](09-realtime-collaboration.md)) |
+| **CRDT conformance** | JUnit + shared Yrs wire vectors | the yrs (UniFFI) binding must produce identical merged state and encoded updates vs Yjs/ydotnet. Mirrors server `CrdtConformanceTests`. **Validate via the short UniFFI integration + conformance spike.** ([09 §9.10](09-realtime-collaboration.md)) |
 | Domain | JUnit5, MockK | Use cases, policy logic, conflict/sync state machine — pure JVM. |
 | Data | Room in-memory/instrumented, MockWebServer | DAOs, migrations (asserted), API mapping, error mapping, outbox/idempotency, delta/manifest reconcile. |
 | ViewModels | Turbine, coroutines-test | MVI state/intent/effect. |
@@ -46,7 +46,7 @@
 
 ## 18.8 Early validation spikes (do these first)
 
-1. **ykt spike** — interop + performance with real collaboration; decide ykt vs. custom yffi binding ([19](19-open-questions.md)).
+1. **yrs (UniFFI) spike** — short UniFFI integration + conformance-vector spike: interop + performance with real collaboration over the reference `yrs`/`yffi` core ([19](19-open-questions.md)).
 2. **Tink HPKE suite-id check** — confirm Tink HPKE matches the server's X25519+HKDF-SHA256+AES-256-GCM exactly.
 3. **SignalR-on-Android spike** — the Java client + RxJava→coroutines bridge, reconnection, share-token upgrade.
 4. **Ink latency spike** — Jetpack Ink + motion prediction + low-latency surface on real S-Pen hardware.
