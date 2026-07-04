@@ -81,3 +81,18 @@ fun open(frame: ByteArray, fk: FileKeyHandle, kind: ObjectKind, fileId: Uuid): B
 - **Constant-time** comparisons for tags/tokens (use library primitives).
 - **Zeroize** key material buffers after use where the JVM allows; prefer Keystore-backed handles for long-lived keys ([07](07-key-and-device-management.md)).
 - **Known-answer tests** for AES-GCM framing, HPKE wrap/unwrap, Ed25519, X25519, BLAKE3, and Argon2id, plus **cross-client conformance vectors** shared with server/desktop/web ([18 §18.5](18-build-ci-testing.md)). This is the single most important test surface in the app.
+
+## 6.10 Group-key wrapping (enterprise/family groups)
+
+Groups ([features/groups.md](https://github.com/Nyxite/Nyxite), [13 §13.7](13-sharing.md), [07 §7.10](07-key-and-device-management.md)) insert **one middle layer** into the envelope hierarchy — no new primitive, just another HPKE target:
+
+```
+personal key  →  wraps  →  group key  →  wraps  →  DEK (FK)  →  encrypts  →  file
+```
+
+- A **group keypair** is **X25519 (HPKE) + Ed25519**, generated **on-device** by the group creator (`core-crypto`, via Tink/libsodium — the same suite as identity keys, §6.2). Its **public** half is published as an HPKE target anyone may wrap to; its **private** half never leaves a member's device in the clear — it is stored **only wrapped**, once per member, under that member's personal X25519 public key.
+- **Unwrap path on this device**: HPKE-`HybridDecrypt` the wrapped **group private key** with the member's identity private key → then HPKE-unwrap each **file DEK** wrapped to the group public key → then AES-256-GCM-`open` the content frame (§6.3). Two HPKE unwraps chained where a personal share is one.
+- **Wrap path**: to grant a group, HPKE-`HybridEncrypt` the FK to the **group public key** — a wrapped-key row whose principal is a group (per scope/generation), identical mechanics to an account share (§6.4), only the target is a group rather than a member. Wrapping needs only the group's *public* key from the directory, so a worker with no membership can still wrap to a managers group (the enterprise "manager reads all" path, §6.10).
+- **Same pinned suite, no exception**: both key-wraps (group-privkey-to-member and DEK-to-group) use **HPKE** `DHKEM(X25519,HKDF-SHA256)/HKDF-SHA256/AES-256-GCM` (`KEM 0x0020`, `KDF 0x0001`, `AEAD 0x0002`); content stays **AES-256-GCM**; signatures **Ed25519**. Group blobs verify against the **shared cross-client conformance vectors** exactly like member wraps (§6.9, [18 §18.5](18-build-ci-testing.md)).
+- **`alg_id`-tagged wrap format (crypto-agility)**: because one group key wraps *many* DEKs, it concentrates any future post-quantum blast radius, so every wrapped **group-key grant** blob carries an explicit **`alg_id`** identifying the wrap algorithm from day one, even though v1 ships classical. The grant shape is `group_id | scope_id | member_id | generation | alg_id | hpke_ct` (matches the pinned fixture P4.4-CORE-1); the DEK-to-group wrapped-key row carries the same agility tag. The client refuses an `alg_id` it does not understand rather than misreading it, mirroring the frame-`version` rule (§6.3).
+- **Zero-knowledge unchanged**: the server holds only the opaque grant blobs, DEK-to-group wraps, and membership rows — never a group private key, a group key generation, or any content key. All group wrap/unwrap happens on-device (P4.4-AND-1).

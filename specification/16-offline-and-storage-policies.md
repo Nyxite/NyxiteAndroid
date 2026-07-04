@@ -63,3 +63,10 @@ Persisted as a `keepOnDevice` setting on files and an inherited default on folde
 ## 16.7 Plaintext export / external-editor interop — not on Android
 
 Storing files **decrypted on shared storage** for editing in other apps is intentionally **a desktop feature, not an Android one**. On Android, content stays inside the encrypted boundary; the app does not write plaintext copies to shared storage. (Standard per-item "share/export" via the system share sheet for a single file remains possible where it makes sense, e.g. exporting a rendered note, but there is no general plaintext working-copy mechanism here.)
+
+## 16.8 Reader-group attachment rides the same cascade
+
+The enterprise/family **reader-group attachment** ([13 §13.7](13-sharing.md)) — a project/folder naming a group whose public key new files are auto-wrapped to on creation — is a **per-project/folder/file inherited setting resolved by the same three-granularity cascade** as keep-on-device ([§16.2](#162-keep-on-device-the-core-control)): a file's effective attachment = its own explicit value if present, else the nearest ancestor's, else none; `inherit` is the default. It is a **structure-metadata** field (opaque to the server), evaluated **on-device at file creation** to decide which group public key to add to the DEK wraps — it changes *who can decrypt*, not what is downloaded or kept.
+
+- **Independent of keep-on-device**: the attachment is orthogonal to the local-retention cascade; a file may be group-readable yet not kept on this device, or kept but ungrouped. The auto-wrap-on-create step is a small extra HPKE wrap ([06 §6.10](06-cryptography.md)), not extra content download.
+- **Mobile storage/battery**: `GroupKeyRotationWorker` ([07 §7.10](07-key-and-device-management.md)) re-wraps only small group-key grants and (optionally) DEKs — never file ciphertext — and runs under the same WorkManager constraints as other background workers (unmetered Wi-Fi + battery-not-low, Doze/App-Standby-respecting, [§16.4](#164-battery--network-constraints)), so a scope rotation is bounded work even on cellular.

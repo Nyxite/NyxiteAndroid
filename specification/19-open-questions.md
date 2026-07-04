@@ -147,5 +147,18 @@ These track the **server's canonical ledger**; the client must match each exactl
 | 19.6 | Protocol `[P]` values | — | Track + conformance lock | Server → Android | Per phase |
 | 19.7 | Realtime client | Official SignalR client | Spike (reconnect, guest token) | Android | Before Phase 2 |
 | 19.8 | Distribution | Play + signed APK | Instance-host setup UX | Owner | Phase 4 |
+| 19.10 | Group sharing (enterprise/family) | **Crypto model + 4 scoping decisions ratified** (master) | Mobile group/attachment UX, re-enrollment flow, rotation-worker spike | Android | Build Phase 4.4 (after 4.3 key transparency) |
 
 Everything else from the original open list (`minSdk`, multi-account, package id) is **resolved** in [§19.0](#190-decisions-already-ratified-this-revision).
+
+## 19.10 Group sharing on mobile (enterprise/family) — *design-time items*
+
+Group sharing ([13 §13.7](13-sharing.md), [06 §6.10](06-cryptography.md), [07 §7.10](07-key-and-device-management.md), build Phase 4.4, steps P4.4-AND-1/2) lands **after key transparency** (build Phase 4.3), which it hard-depends on for enrollment. The crypto model and the four scoping decisions are **ratified** in the master [`docs/OPEN-DECISIONS.md`](https://github.com/Nyxite/Nyxite); the Android-specific **design-time** (not open-decision) items:
+
+- **Group-management UX on a phone** — how group create / member enroll / member remove and the **transparency-verification result** are surfaced on a small screen; how the group-size-limit reject and the honest "already-decrypted content can't be recalled" caveat read in a mobile removal dialog ([13 §13.7](13-sharing.md)).
+- **Reader-group attachment UX & cascade** — presenting the per-project/folder `inherit`/group/none attachment ([16 §16.8](16-offline-and-storage-policies.md)) and making the enterprise "manager reads all" auto-wrap-on-create obvious to a worker (what a manager can read) without cluttering the create flow.
+- **Re-enrollment flow** for a member who lost **all** devices **and** the recovery phrase — the admin-issued one-new-grant path ([07 §7.10](07-key-and-device-management.md)): how the admin initiates it and how the recovering member's fresh device picks up the new grant.
+- **`GroupKeyRotationWorker` under mobile constraints** — validating scope-scoped rotation (re-wrap to remaining + optional DEK re-seal) with the `409`/`412` retry paths across WorkManager runs straddling the lock window ([§19.2](#192-on-device-key-storage-lock-model--enrollment-ux--recommend-a-concrete-model)), and the group-key unlock behaving like the FK unlock within the biometric validity window.
+- **Scope granularity** — per-project vs per-time-period (server-owned sub-choice, [§19.6](#196-server-owned-protocol-items-track--confirm)); the client must match whatever the server pins and lock it via conformance vectors.
+
+**How to validate**: fold into the Phase-4 group spike — a two-account family read + an enterprise manager-reads-all scenario on real hardware, asserting O(1) enrollment (one grant blob), transparency-checked enroll, scope rotation on removal, and recovery restoring group access ([07 §7.10](07-key-and-device-management.md)).

@@ -81,3 +81,30 @@ The server simultaneously drops the removed member's ACL grant (instant cutoff) 
 Decisions (see [19 §19.0](19-open-questions.md)): **StrongBox when present**, else TEE-backed Keystore; **biometric/credential unlock with a 10-minute validity window** (configurable 1–60 min, or every-use), so background content sync works within the window while structure sync always runs ([19 §19.2](19-open-questions.md), [16 §16.4](16-offline-and-storage-policies.md)); **Argon2id m = 64 MiB, t = 3, p = 1**; **BIP39 24-word** recovery phrase with scrubbed re-entry; **device-to-device approval via QR (primary) + numeric code (fallback)** showing the new device's label + fingerprint.
 
 Remaining validation (hardware spike, [19 §19.2/§19.3](19-open-questions.md)): StrongBox availability/limits across target devices; biometric validity-window behavior across OEMs straddling WorkManager runs; final Argon2id tuning on a low/mid/high device trio.
+
+## 7.10 Group keys (enterprise/family groups)
+
+Groups add a **group keypair** between the identity key and the FK ([06 §6.10](06-cryptography.md), [13 §13.7](13-sharing.md), [features/groups.md](https://github.com/Nyxite/Nyxite)). The client is the only party that ever holds a group private key in the clear; the server stores opaque grant blobs + membership rows only (P4.4-AND-1/2).
+
+### Group keygen & scope
+- Creating a group generates a **group keypair (X25519 + Ed25519) on-device** (`core-crypto`), publishes the **public** halves, and self-signs the directory entry (Ed25519) like an identity entry ([06 §6.7](06-cryptography.md)). The private half is never uploaded unwrapped.
+- Keys are **scoped** per project / time-period and **flat** (no nesting): a file wraps to the group key **of its scope**, so removing a member re-wraps only the affected scope, never the group's whole history.
+
+### Transparency-verified enrollment
+- Adding a member is **O(1)**: fetch the newcomer's identity **public key**, then **verify it against the key-transparency log (build Phase 4.3)** *before* wrapping. Because one substituted key would expose the whole group's corpus (not a single file), group enrollment does **not** rely on the TLS + Ed25519-self-signature model alone that per-file account shares use in v1.0.0 ([13 §13.6](13-sharing.md)) — it **depends on** key transparency, which is pulled into v1.0.0 as build Phase 4.3 ahead of groups (Phase 4.4). A directory-substituted key fails the inclusion proof and enrollment is rejected **before any wrap**.
+- On success the client HPKE-wraps the **group private key** to the verified public key and writes **one** append-only `group-key grant` blob (`group_id | scope_id | member_id | generation | alg_id | hpke_ct`, [06 §6.10](06-cryptography.md)). No file is touched; the one grant instantly grants every file the group's scope can read.
+
+### Group-key grant handling
+- **Open**: `GET` the caller's group-key grant → HPKE-unwrap the group private key with the identity private key → cache the wrapped form locally, hold the unwrapped group key in the in-memory `UserSession` only ([01 §1.8](01-architecture.md)), never persisted in plaintext — then unwrap file DEKs ([06 §6.10](06-cryptography.md)).
+- **Grant one file to a group**: HPKE-wrap that file's FK to the group public key; one wrapped-key row. Individual one-off shares still go the account-share path ([13 §13.1](13-sharing.md)); the two **coexist**.
+
+### `GroupKeyRotationWorker` (member removal)
+When a member is removed, a remaining member's client rotates the **affected scope's** group key so the removed member reads nothing new — the Phase-2.3 rotation machinery ([§7.6](#76-key-rotation--revocation-client-driven-forward-secrecy)) applied at the group-key level, run in the background via **`GroupKeyRotationWorker`** (WorkManager, sibling to `KeyRotationWorker`):
+1. Generate a new group keypair for the scope (`generation + 1`); re-wrap the new group private key to every **remaining** member (one grant blob each).
+2. **Optional DEK re-seal** (full/"seal history" revocation): re-wrap the affected scope's file DEKs under the new group key — re-wraps only the small DEKs, never the file ciphertext.
+3. `POST /groups/{id}/keys/rotate`; the server generation-guards per scope. A **concurrent rotation loser gets `409`** — abandon and refetch the new generation; an **in-flight old-key wrap gets `412 key_generation_stale`** — refetch and re-seal under the current generation.
+- The server drops the removed member's grant instantly (soft delete, one delete) even before rotation completes; already-decrypted content can't be recalled (surfaced honestly in the UI, [13 §13.7](13-sharing.md)). Only the affected scope is touched.
+
+### Recovery restores group access
+- Because each group private key is wrapped under the member's **personal** public key, **recovering the identity key** (recovery phrase, [§7.4](#74-recovery-key)) automatically restores all group access on the new device — the group grants simply unwrap under the recovered personal key, **no special path**.
+- A member who loses **all** devices **and** the recovery phrase must be **re-enrolled by a group admin** (one new grant re-wrapping the group key to their new public key), exactly like initial enrollment.

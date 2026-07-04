@@ -41,3 +41,24 @@ The server stores only the opaque wrapped blob; it never sees the FK.
 - Directory trust is **TLS + Ed25519 self-signature** on entries; **key transparency / safety-number verification is deferred to Phase 6**. Until then, surface the grantee's key fingerprint so cautious users can compare out-of-band.
 - The client respects server rate limits on `GET /keys/directory`, `POST /shares`, and `/share/{token}` access (`429` backoff, [05](05-api-client.md)).
 - Fragment keys (≥256-bit) and link tokens (≥128-bit) are generated with a CSPRNG; the app warns that links in chat/history can leak the fragment, so prefer account shares for sensitive material and use short expiries for links.
+
+## 13.7 Group sharing (enterprise/family groups)
+
+A **third share kind** for team/family scale: instead of wrapping the FK to each member, files wrap to a **group public key** whose private half is wrapped once per member ([06 §6.10](06-cryptography.md), [07 §7.10](07-key-and-device-management.md), [features/groups.md](https://github.com/Nyxite/Nyxite)). Adding a reader is **one** small key-wrap (**O(1)**) instead of re-wrapping every file (**O(files)**). Two archetypes: **family** (all members read shared data) and **enterprise** (a *managers* group reads all of a team's files; workers read only their own). It **coexists** with account and link shares (§13.1–13.2) — the user picks per situation; groups add no new primitive (P4.4-AND-1/2).
+
+### 13.7.1 Group-management UI
+- A **Groups** area (in `feature-sharing`/settings) to create a group (on-device keygen, [07 §7.10](07-key-and-device-management.md)), list members, and **enroll**/**remove** members. Enrollment looks up the newcomer's public key and shows the transparency-verification result **before** any wrap (a directory-substituted key is rejected pre-wrap, [07 §7.10](07-key-and-device-management.md)); removal offers the revocation spectrum below.
+- Enrolling past the server's group-size limit surfaces the reject (existence-hiding applies; over-limit is server-enforced by membership-row count, never a key/content read).
+
+### 13.7.2 Wrapping a file / subtree to a group
+- **Share to group** on a file/folder/project: HPKE-wrap the target FK(s) to the group's public key (`POST` a DEK-to-group wrapped-key row per scope/generation) and `POST /shares` with the group as principal. A folder/project target wraps the relevant per-file FKs to the group (batched/lazily), exactly as the account-share subtree path (§13.1) — a file readable by a whole group is stored **once** plus **one** DEK-to-group wrap, no duplication.
+
+### 13.7.3 Reader-group attachment & auto-wrap on create
+- A project/folder may carry a **reader-group attachment** naming a group whose public key **new files are auto-wrapped to on creation**, in addition to the author's own key — this drives the enterprise "manager reads all" path. It rides the **existing per-project/folder/file cascade** (`inherit` / a specific group / none), the same inheritance used for keep-on-device ([16 §16.2](16-offline-and-storage-policies.md), [16 §16.8](16-offline-and-storage-policies.md)) and sync policy.
+- **Client-enforced at file creation** (P4.4-AND-2): when a worker creates a file under an attached scope, the client wraps the DEK to **the author key *and* the attached group's public key** ([07 §7.5](07-key-and-device-management.md)); a manager reads it via the group key, another worker has no path (cryptographically locked out). Wrapping needs only the group's public key from the directory, so the worker needs no membership in the managers group. The server stores the attachment as opaque structure metadata only.
+
+### 13.7.4 Revocation (honest, group-scoped)
+Removing a member reuses the two-layer model (§13.5) at the group-key level:
+- **Instant ACL cutoff**: soft-delete the member's group-key grant (one delete); they can no longer fetch group blobs.
+- **Forward-secrecy rotation**: a remaining member's client runs **`GroupKeyRotationWorker`** — new group key for the **affected scope** (`generation + 1`), re-wrap to remaining members, optional DEK re-seal; concurrent loser `409`, in-flight old-key wrap `412` then re-seal ([07 §7.10](07-key-and-device-management.md)). Only the affected scope is touched; the group shows a `Rotating` state.
+- **The UI stays honest**: as with per-file revocation, already-decrypted content **can't be recalled** — rotation only guarantees the removed member reads nothing **new**. Surfaced in the removal dialog and docs, exactly as §13.5.

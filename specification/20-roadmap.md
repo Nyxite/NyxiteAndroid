@@ -30,6 +30,11 @@ Before Phase 1 logic is committed, run the **early spikes** ([18 §18.8](18-buil
 ## Phase 6 — Advanced hardening (optional)
 **Deliver**: key transparency / safety-number verification UI for the key directory ([13 §13.6](13-sharing.md)); optional metadata-graph hiding support if the server adds it.
 
+## Group sharing (enterprise/family) — build Phase 4.4 (v1.0.0)
+Maps to the **master build plan's Phase 4.4** ([implementation/phase-4.4-groups.md](https://github.com/Nyxite/Nyxite), steps **P4.4-AND-1/2**), landing in **v1.0.0 after key transparency (build Phase 4.3)** — its **hard dependency**: group enrollment wraps only to **transparency-log-verified** public keys, so key transparency is pulled into v1.0.0 ahead of groups (this brings forward the directory-transparency work the Android roadmap otherwise surfaces in Phase 6, [13 §13.6](13-sharing.md)). Builds on the Phase 2 sharing foundation (HPKE wrap + rotation-based revocation).
+**Deliver**: on-device **group keygen**, **transparency-verified enrollment**, unwrap/wrap of group keys and DEKs, and **group-management UI** (P4.4-AND-1, [06 §6.10](06-cryptography.md), [07 §7.10](07-key-and-device-management.md), [13 §13.7](13-sharing.md)); the **reader-group attachment** cascade with **auto-wrap-on-create** (enterprise "manager reads all") and the **`GroupKeyRotationWorker`** for scope-scoped rotation on member removal (P4.4-AND-2, [16 §16.8](16-offline-and-storage-policies.md)); honest revocation UI ("already-decrypted content can't be recalled"); recovery restores group access automatically.
+**Done when**: a **family** group reads a shared folder (O(1) enrollment — one grant blob per member, no file re-wrapped); an **enterprise** project auto-wraps new files to the attached *managers* group (a manager reads, another worker can't); enrollment is transparency-checked; removing a member soft-deletes the grant instantly and a remaining member rotates the affected scope's group key (`409` concurrent loser, `412` in-flight old-key wrap then re-seal); recovering the identity key restores group access; server inspection shows only opaque grants/DEK-to-group wraps/membership rows.
+
 > **Multi-account / instance switching is in v1.0.0** (foundation in Phase 0, switcher UI in Phase 4), not deferred — see [14 §14.7](14-authentication.md).
 
 ## Cross-cutting / later

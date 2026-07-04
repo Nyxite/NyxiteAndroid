@@ -37,6 +37,13 @@ Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt a
 
 - Create and manage share links (link key in the URL fragment; account shares wrap the file key to the recipient's public key via HPKE, on-device)
 
+## Group sharing (enterprise/family)
+
+- Group management ([features/groups.md](groups.md)) on-device: generate a group keypair, enroll/remove members, unwrap the group key → DEKs; enrollment **verifies the member's public key against the key-transparency log** before wrapping
+- Wrap a file/subtree DEK to a group public key; honor the per-project/folder **reader-group attachment** — auto-wrap new files to the attached group's public key (the enterprise "manager reads all" path)
+- `GroupKeyRotationWorker` — scope-scoped group-key rotation on member removal (re-wrap to remaining, optional DEK re-seal); honest UI that already-decrypted content can't be recalled
+- Recovering the identity key restores group access automatically
+
 ## Encryption & keys
 
 - On-device AES-256-GCM content encryption; HPKE wrap/unwrap of file keys
