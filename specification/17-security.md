@@ -1,6 +1,6 @@
 # 17 — Security (Device-Side)
 
-The server-side threat model is covered by [server 13](https://github.com/Nyxite/server) (zero-knowledge: DB/blob theft, malicious operator, curious admin all yield no content). This document covers the **device-side** threats the Android client must defend, since on a mobile device the plaintext and keys *do* live locally.
+The server-side threat model is covered by [server 13](https://github.com/Nyxite/NyxiteServer) (zero-knowledge: DB/blob theft, malicious operator, curious admin all yield no content). This document covers the **device-side** threats the Android client must defend, since on a mobile device the plaintext and keys *do* live locally.
 
 ## 17.1 Threats considered
 

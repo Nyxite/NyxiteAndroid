@@ -1,6 +1,6 @@
 # 13 — Sharing & Access Control
 
-Two-layer model ([server 09](https://github.com/Nyxite/server)): a **server-enforced ACL** (who may reach the ciphertext/relay) plus a **cryptographic layer** (who can decrypt). The client manages both: it calls the share API for the ACL and performs the key wrapping for the crypto layer. Two share kinds: **account shares** (HPKE-wrapped FK) and **link shares** (FK in the URL fragment).
+Two-layer model ([server 09](https://github.com/Nyxite/NyxiteServer)): a **server-enforced ACL** (who may reach the ciphertext/relay) plus a **cryptographic layer** (who can decrypt). The client manages both: it calls the share API for the ACL and performs the key wrapping for the crypto layer. Two share kinds: **account shares** (HPKE-wrapped FK) and **link shares** (FK in the URL fragment).
 
 ## 13.1 Account share (user grant)
 

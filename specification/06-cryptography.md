@@ -1,6 +1,6 @@
 # 06 — Cryptography
 
-This is the most consequential module (`core-crypto`). It must be **bit-compatible with the server's framing and the other clients' implementations** (Yjs/web, ydotnet/desktop) — a mismatch means data that round-trips on one client is unreadable on another. Everything here mirrors [server 07](https://github.com/Nyxite/server).
+This is the most consequential module (`core-crypto`). It must be **bit-compatible with the server's framing and the other clients' implementations** (Yjs/web, ydotnet/desktop) — a mismatch means data that round-trips on one client is unreadable on another. Everything here mirrors [server 07](https://github.com/Nyxite/NyxiteServer).
 
 ## 6.1 Posture
 

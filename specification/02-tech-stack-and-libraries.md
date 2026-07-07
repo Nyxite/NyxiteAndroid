@@ -68,7 +68,7 @@ The on-disk/on-wire **ink stroke format** is a Nyxite-defined, versioned, encryp
 
 ## 2.7 Cryptography
 
-All primitives must match the server's algorithm table ([server 07 §7.3](https://github.com/Nyxite/server); reproduced in [06 §6.2](06-cryptography.md)).
+All primitives must match the server's algorithm table ([server 07 §7.3](https://github.com/Nyxite/NyxiteServer); reproduced in [06 §6.2](06-cryptography.md)).
 
 | Purpose | Library | Notes |
 |---------|---------|-------|

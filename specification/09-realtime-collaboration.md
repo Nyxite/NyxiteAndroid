@@ -1,6 +1,6 @@
 # 09 — Real-time Collaboration
 
-Live multi-user editing of text documents over an **encrypted relay**: the server stores and forwards encrypted CRDT updates but never merges or reads them; **the Android client runs the Yrs engine (yrs via UniFFI) and merges locally** ([server 05](https://github.com/Nyxite/server)). The engine is the reference Rust `yrs`/`yffi` core wrapped by UniFFI-generated Kotlin bindings; a short UniFFI integration + conformance spike validates it ([19](19-open-questions.md)).
+Live multi-user editing of text documents over an **encrypted relay**: the server stores and forwards encrypted CRDT updates but never merges or reads them; **the Android client runs the Yrs engine (yrs via UniFFI) and merges locally** ([server 05](https://github.com/Nyxite/NyxiteServer)). The engine is the reference Rust `yrs`/`yffi` core wrapped by UniFFI-generated Kotlin bindings; a short UniFFI integration + conformance spike validates it ([19](19-open-questions.md)).
 
 ## 9.1 Components
 

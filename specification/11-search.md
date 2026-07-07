@@ -1,6 +1,6 @@
 # 11 — Search (Client-Side)
 
-The server holds **no index** (it can't read content). Search lives where the keys and plaintext live — on the device — over the device's **local subset** ([server 11](https://github.com/Nyxite/server)). The desktop is the full-corpus surface; Android searches what it has cached.
+The server holds **no index** (it can't read content). Search lives where the keys and plaintext live — on the device — over the device's **local subset** ([server 11](https://github.com/Nyxite/NyxiteServer)). The desktop is the full-corpus surface; Android searches what it has cached.
 
 ## 11.1 Scope on Android
 

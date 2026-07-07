@@ -1,6 +1,6 @@
 # 12 — Version History
 
-Full history of **encrypted, content-addressed snapshots**; **diffs and restore run on the device** because the server can't read either version ([server 10](https://github.com/Nyxite/server)).
+Full history of **encrypted, content-addressed snapshots**; **diffs and restore run on the device** because the server can't read either version ([server 10](https://github.com/Nyxite/NyxiteServer)).
 
 ## 12.1 Listing
 
