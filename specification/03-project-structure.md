@@ -15,7 +15,7 @@ NyxiteAndroid/
 ├── core/
 │   ├── core-model/                    # pure Kotlin domain entities, enums, value types (no Android)
 │   ├── core-common/                   # Result types, DispatcherProvider, time, base64url, logging facade
-│   ├── core-crypto/                   # CryptoEngine API + Tink/BLAKE3/Argon2 impl; framing; addressing
+│   ├── core-crypto/                   # CryptoEngine API + Tink/hybrid-PQC(ML-KEM-768,ML-DSA-65)/BLAKE3/Argon2 impl; framing; addressing
 │   ├── core-crdt/                     # CrdtEngine API + yrs (UniFFI) impl; snapshots, state vectors
 │   ├── core-keystore/                 # KeyStoreVault: Android Keystore/StrongBox wrapping
 │   ├── core-database/                 # Room + SQLCipher: entities, DAOs, FTS, migrations

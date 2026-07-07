@@ -7,7 +7,7 @@ Covers the identity keypair, device enrollment, the recovery key, FK rotation, a
 ```
 Android Keystore / StrongBox key (hardware-backed, non-exportable)
    └─ wraps → DB master key (SQLCipher) and the Identity Key Store
-                 └─ holds → Identity private keys: X25519 (HPKE) + Ed25519 (sign)
+                 └─ holds → Identity private keys: hybrid X25519+ML-KEM-768 (HPKE) + hybrid Ed25519+ML-DSA-65 (sign)
                               └─ unwraps → File Keys (FK, per file)
 Recovery key (user-held phrase) ──Argon2id──► wrapping key ──► escrow of identity private key (server-opaque)
 Device key (per device) ──► used to approve/enroll new devices
@@ -19,7 +19,7 @@ The Keystore key is the on-device root of trust: it is generated in hardware, ne
 
 - Generate an **`AndroidKeyStore`** AES key (`setIsStrongBoxBacked(true)` when `FEATURE_STRONGBOX_KEYSTORE` is present; fall back gracefully). Use it to wrap:
   - the **DB master key** (SQLCipher passphrase),
-  - the **Identity Key Store** blob (the X25519+Ed25519 private keys, themselves serialized and AES-GCM-encrypted).
+  - the **Identity Key Store** blob (the hybrid private keys — X25519+ML-KEM-768 for HPKE and Ed25519+ML-DSA-65 for signing — themselves serialized and AES-GCM-encrypted).
 - Configure `setUserAuthenticationRequired` **per the user's security setting; default on with a 10-minute validity window** (configurable 1–60 min, or per-use auth via `BiometricPrompt` → `CryptoObject`) for the unlock operation ([17](17-security.md), [19 §19.2](19-open-questions.md)).
 - The unlocked identity private keys live only in the in-memory `UserSession` ([01 §1.8](01-architecture.md)); on lock/logout the session is cleared and buffers zeroized.
 - **StrongBox caveat**: StrongBox has small key/throughput limits — use it for the wrapping key only, not for bulk content; do bulk AES-GCM in software with FK material in memory.
@@ -28,14 +28,14 @@ The Keystore key is the on-device root of trust: it is generated in hardware, ne
 
 ### First device / first sign-in
 1. User authenticates with the Nyxite server (native password+TOTP or passkey by default; enterprise Keycloak OIDC optional) → access token ([14](14-authentication.md)).
-2. App checks the key directory (`GET /keys/directory?userId=me`): if the user has **no identity keypair yet** (brand-new account), generate X25519 + Ed25519, store privates in the Keystore-wrapped identity store, and **publish publics** via `PUT /keys`.
+2. App checks the key directory (`GET /keys/directory?userId=me`): if the user has **no identity keypair yet** (brand-new account), generate the **hybrid keypairs (X25519+ML-KEM-768 for HPKE, Ed25519+ML-DSA-65 for signing)**, store privates in the Keystore-wrapped identity store, and **publish publics** via `PUT /keys`.
 3. Generate a **device keypair**; register the device via `POST /devices { label, pubkey }` → `{ deviceId, status: "pending", pairingCode, qrPayload }`.
 4. Generate the **recovery key** and escrow ([§7.4](#74-recovery-key)). Force the user through the recovery-key flow before completing setup.
 
 ### Additional device (user already has an identity keypair elsewhere)
 This device has the account token but **not** the identity private key. Two paths:
 
-- **(A) Device-to-device approval.** New device registers (`POST /devices { label, pubkey }` → `status: "pending"` + `pairingCode`/`qrPayload`) and displays the QR (primary) + 6–8 digit numeric code (fallback). An already-enrolled device approves via `POST /devices/{id}/approve { wrappedIdentityKey }`, where `wrappedIdentityKey = HPKE-seal(newDevicePubkey, identity bundle)`; the server relays the opaque blob. The new device fetches it once via `GET /devices/me/enrollment` → `{ wrappedIdentityKey }` (**single-use**; the server deletes the blob after the fetch) and unwraps with its device private key. Interactive confirmation required on the enrolled device.
+- **(A) Device-to-device approval.** New device registers (`POST /devices { label, pubkey }` → `status: "pending"` + `pairingCode`/`qrPayload`) and displays the QR (primary) + 6–8 digit numeric code (fallback). An already-enrolled device approves via `POST /devices/{id}/approve { wrappedIdentityKey }`, where `wrappedIdentityKey = HPKE-seal(newDevicePubkey, identity bundle)` under the **hybrid X25519+ML-KEM-768 HPKE** suite; the server relays the opaque blob. The new device fetches it once via `GET /devices/me/enrollment` → `{ wrappedIdentityKey }` (**single-use**; the server deletes the blob after the fetch) and unwraps with its device private key. Interactive confirmation required on the enrolled device.
 - **(B) Recovery-key unwrap.** User enters the recovery phrase; the app fetches the escrow blob (`GET /recovery` + `kdf_params`), derives the wrapping key (Argon2id), unwraps the identity private key, then stores it Keystore-wrapped and proceeds. This is the path when no other device is available.
 
 Until enrolled with the identity private key, the device can authenticate and see structure (encrypted) but **cannot decrypt content**; the UI shows a clear "enroll this device" state.
@@ -43,7 +43,7 @@ Until enrolled with the identity private key, the device can authenticate and se
 ## 7.4 Recovery key
 
 - Generated as a **BIP39 24-word phrase** (256-bit, checksummed, vetted word list) **shown once**. The app must make the user record it (copy, write down, confirm by re-entry) and warn unmistakably: **losing all devices and this phrase = permanent, unrecoverable data loss** (no server/admin escrow exists).
-- The app derives a wrapping key via **Argon2id** (m = 64 MiB, t = 3, p = 1, tunable, tuned on hardware — [06 §6.8](06-cryptography.md)) and **seals the identity bundle (X25519 priv ‖ Ed25519 priv) with AES-256-GCM** under that derived key (DECISION: AES-GCM, **not** HPKE — symmetric key, [06 §6.4](06-cryptography.md)). The recovery-blob shape is `{ version, kdf:{alg:"argon2id", m, t, p, salt(16)}, nonce(12), ciphertext, tag(16) }` with **AAD = `userId ‖ version`**. It uploads the **opaque** escrow + non-secret `kdf_params` via `PUT /recovery`. The server stores it but cannot open it.
+- The app derives a wrapping key via **Argon2id** (m = 64 MiB, t = 3, p = 1, tunable, tuned on hardware — [06 §6.8](06-cryptography.md); symmetric and **un-peppered**, no PQC dimension) and **seals the hybrid identity bundle (X25519 priv ‖ ML-KEM-768 priv ‖ Ed25519 priv ‖ ML-DSA-65 priv) with AES-256-GCM** under that derived key (DECISION: AES-GCM, **not** HPKE — symmetric key, [06 §6.4](06-cryptography.md)). The recovery-blob shape is `{ version, kdf:{alg:"argon2id", m, t, p, salt(16)}, nonce(12), ciphertext, tag(16) }` with **AAD = `userId ‖ version`**. It uploads the **opaque** escrow + non-secret `kdf_params` via `PUT /recovery`. The server stores it but cannot open it.
 - Re-issuing a recovery key (rotation) re-wraps the escrow under a new phrase and re-uploads; old phrase invalidated client-side by overwrite.
 - The recovery key is **never** stored on the device in plaintext; if the user opts to keep a copy, it is their responsibility outside the app.
 
@@ -87,11 +87,11 @@ Remaining validation (hardware spike, [19 §19.2/§19.3](19-open-questions.md)):
 Groups add a **group keypair** between the identity key and the FK ([06 §6.10](06-cryptography.md), [13 §13.7](13-sharing.md), [features/groups.md](https://github.com/Nyxite/Nyxite)). The client is the only party that ever holds a group private key in the clear; the server stores opaque grant blobs + membership rows only (P4.4-AND-1/2).
 
 ### Group keygen & scope
-- Creating a group generates a **group keypair (X25519 + Ed25519) on-device** (`core-crypto`), publishes the **public** halves, and self-signs the directory entry (Ed25519) like an identity entry ([06 §6.7](06-cryptography.md)). The private half is never uploaded unwrapped.
+- Creating a group generates a **hybrid group keypair (X25519+ML-KEM-768 + Ed25519+ML-DSA-65) on-device** (`core-crypto`), publishes the **public** halves, and self-signs the directory entry (hybrid Ed25519+ML-DSA-65) like an identity entry ([06 §6.7](06-cryptography.md)). The private half is never uploaded unwrapped.
 - Keys are **scoped** per project / time-period and **flat** (no nesting): a file wraps to the group key **of its scope**, so removing a member re-wraps only the affected scope, never the group's whole history.
 
 ### Transparency-verified enrollment
-- Adding a member is **O(1)**: fetch the newcomer's identity **public key**, then **verify it against the key-transparency log (build Phase 4.3)** *before* wrapping. Because one substituted key would expose the whole group's corpus (not a single file), group enrollment does **not** rely on the TLS + Ed25519-self-signature model alone that per-file account shares use in v1.0.0 ([13 §13.6](13-sharing.md)) — it **depends on** key transparency, which is pulled into v1.0.0 as build Phase 4.3 ahead of groups (Phase 4.4). A directory-substituted key fails the inclusion proof and enrollment is rejected **before any wrap**.
+- Adding a member is **O(1)**: fetch the newcomer's identity **public key**, then **verify it against the key-transparency log (build Phase 4.3)** *before* wrapping. Because one substituted key would expose the whole group's corpus (not a single file), group enrollment does **not** rely on the TLS + hybrid-Ed25519+ML-DSA-65-self-signature model alone that per-file account shares use in v1.0.0 ([13 §13.6](13-sharing.md)) — it **depends on** key transparency, which is pulled into v1.0.0 as build Phase 4.3 ahead of groups (Phase 4.4). A directory-substituted key fails the inclusion proof and enrollment is rejected **before any wrap**.
 - On success the client HPKE-wraps the **group private key** to the verified public key and writes **one** append-only `group-key grant` blob (`group_id | scope_id | member_id | generation | alg_id | hpke_ct`, [06 §6.10](06-cryptography.md)). No file is touched; the one grant instantly grants every file the group's scope can read.
 
 ### Group-key grant handling

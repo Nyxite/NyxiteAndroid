@@ -59,10 +59,10 @@ Explicitly **out of scope for v1.0.0** (deferred, matching server Phase 5–6 an
 ## 0.6 Glossary (client-facing)
 
 - **FK (file key)** — per-file AES-256-GCM 256-bit key, generated on-device, stored on the server only *wrapped*.
-- **Identity keypair** — per-user X25519 (HPKE/key-agreement) + Ed25519 (signing); private parts never leave the device.
+- **Identity keypair** — per-user **hybrid X25519 + ML-KEM-768** (HPKE/key-agreement) + **hybrid Ed25519 + ML-DSA-65** (signing), NIST level 3 ([06 §6.2](06-cryptography.md)); private parts never leave the device.
 - **Device key** — per-device keypair used for device-to-device enrollment approval.
 - **Recovery key** — high-entropy user-held secret (phrase) that, via Argon2id, wraps an escrow of the identity private key; the only recovery path.
-- **Wrapped key** — an FK encrypted to a member's X25519 public key via HPKE (account share).
+- **Wrapped key** — an FK encrypted to a member's **hybrid X25519 + ML-KEM-768** public key via HPKE (account share).
 - **Fragment key** — an FK carried in a share link's URL fragment (`#k=…`), never sent to the server (link/guest share).
 - **Content address** — BLAKE3-256 hash of the *plaintext*, used as the blob's storage key; computed on-device.
 - **Encrypted frame** — the on-the-wire/at-rest container: `magic(4)|version(1)|key_id(16)|nonce(12)|ciphertext|tag(16)` with AAD binding `file_id` + object kind ([06](06-cryptography.md)).

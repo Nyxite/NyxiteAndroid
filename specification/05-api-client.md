@@ -50,7 +50,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET /keys/directory?userId=` | `?email=` *(public keys)*
 - `PUT /keys` *(publish/rotate own public identity keys)*
 - `GET/POST/DELETE /devices`, `/devices/{id}` — `POST /devices { label, pubkey }` → `{ deviceId, status: "pending", pairingCode, qrPayload }` (QR primary + 6–8 digit numeric code fallback, [07 §7.3](07-key-and-device-management.md))
-- `POST /devices/{id}/approve { wrappedIdentityKey }` — approving device sends `wrappedIdentityKey = HPKE-seal(newDevicePubkey, identity bundle)`
+- `POST /devices/{id}/approve { wrappedIdentityKey }` — approving device sends `wrappedIdentityKey = HPKE-seal(newDevicePubkey, identity bundle)` under the hybrid X25519 + ML-KEM-768 HPKE suite ([06 §6.2](06-cryptography.md))
 - `GET /devices/me/enrollment` → `{ wrappedIdentityKey }` once approved — **single-use**; the server deletes the blob after this fetch
 - `GET/PUT /recovery` *(server-opaque escrow blob + `kdf_params`)*
 

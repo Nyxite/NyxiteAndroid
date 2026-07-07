@@ -10,15 +10,17 @@ The Android device is a full cryptographic peer. It generates file keys, encrypt
 
 | Purpose | Algorithm | Android mapping |
 |---------|-----------|-----------------|
-| Content / CRDT / snapshot encryption | **AES-256-GCM** (96-bit nonce, 128-bit tag) | Tink `AesGcm` / JCE `AES/GCM/NoPadding` |
-| Public-key wrap (file-key to a member, device enrollment to a device pubkey) | **HPKE**: DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / AES-256-GCM — RFC 9180 IDs `KEM=0x0020`, `KDF=0x0001`, `AEAD=0x0002` | Tink HPKE (`HybridEncrypt`/`HybridDecrypt`) — **verify suite IDs** ([§6.4](#64-hpke-wrapping)) |
-| Symmetric wrap (recovery blob) | **AES-256-GCM** under an Argon2id-derived key | JCE/Tink AES-GCM ([§6.4](#64-hpke-wrapping), [07 §7.4](07-key-and-device-management.md)) |
-| Identity key agreement | **X25519** | Tink / `XDH` |
-| Signing (updates, key-directory entries) | **Ed25519** | Tink `PublicKeySign`/`PublicKeyVerify` |
-| Recovery-key derivation | **Argon2id → wrapping key** (m = 64 MiB, t = 3, p = 1; tunable, stored in `recovery_blobs.kdf_params`) | argon2-jvm |
-| Plaintext hashing (content address) | **BLAKE3-256** | BLAKE3 JVM lib |
+| Content / CRDT / snapshot encryption | **AES-256-GCM** (96-bit nonce, 128-bit tag) — *symmetric, unchanged; already quantum-safe* | Tink `AesGcm` / JCE `AES/GCM/NoPadding` |
+| Public-key wrap (file-key to a member, device enrollment to a device pubkey) | **Hybrid HPKE**: KEM = **X25519 + ML-KEM-768** (classical + PQC shared secrets concatenated), then HKDF-SHA256 / AES-256-GCM — HPKE base mode, **NIST level 3**; suite id `X25519MLKEM768` on the `alg_id` tag (§6.4) | Hybrid-capable HPKE library — **Tink alone is insufficient (no ML-KEM)**; see [02 §2.7](02-tech-stack-and-libraries.md) for the hybrid-crypto dependency, **verify suite IDs** ([§6.4](#64-hpke-wrapping)) |
+| Symmetric wrap (recovery blob) | **AES-256-GCM** under an Argon2id-derived key — *symmetric, unchanged* | JCE/Tink AES-GCM ([§6.4](#64-hpke-wrapping), [07 §7.4](07-key-and-device-management.md)) |
+| Identity key agreement | **Hybrid X25519 + ML-KEM-768** (NIST level 3) | Hybrid-capable library (Tink `XDH` for the X25519 half + a PQC lib for ML-KEM-768) |
+| Signing (updates, key-directory entries, device enrollment) | **Hybrid Ed25519 + ML-DSA-65** (dual signature, NIST level 3) | Hybrid-capable library — **Tink alone is insufficient (no ML-DSA)** ([02 §2.7](02-tech-stack-and-libraries.md)) |
+| Recovery-key derivation | **Argon2id → wrapping key** (m = 64 MiB, t = 3, p = 1; tunable, stored in `recovery_blobs.kdf_params`) — *symmetric, unchanged; PQC does NOT touch password/recovery hashing* | argon2-jvm |
+| Plaintext hashing (content address) | **BLAKE3-256** — *symmetric, unchanged* | BLAKE3 JVM lib |
 
 These values are **pinned to the server's canonical ledger** and must be byte-identical across clients; the client tracks the server's `07` and fails CI on any drift ([18 §18.5](18-build-ci-testing.md)).
+
+**Post-quantum hybrid at v1.0.0 (resolved 2026-07-07).** Every **asymmetric** seam ships **hybrid classical + PQC** from v1.0.0 — HPKE key-wrap/agreement is **X25519 + ML-KEM-768** and every signature is **Ed25519 + ML-DSA-65**, both at **NIST security level 3**. Hybrid means the two shared secrets / signatures are **concatenated**: an attacker must break **both** the classical and the PQC half, so the construction is safe unless both fall. This closes the harvest-now-decrypt-later exposure on the server's indefinitely-stored, X25519-wrapped file keys. **Symmetric primitives are untouched** — AES-256-GCM, Argon2id, and BLAKE3 are already quantum-safe at their current sizes, and PQC does **not** touch password/recovery-key hashing. The hybrid suite is carried on the existing `alg_id` agility tag (§6.10), so re-wrap only ever touches the **small** wrapped keys, never content ciphertext.
 
 **System rule — HPKE vs AES-256-GCM**: use **HPKE wherever the target is a public key** (file-key wrap to members, device enrollment to a device pubkey); use **AES-256-GCM wherever the key is symmetric** (all content + the recovery blob).
 
@@ -46,9 +48,9 @@ fun open(frame: ByteArray, fk: FileKeyHandle, kind: ObjectKind, fileId: Uuid): B
 
 > Naming note: this section also covers the **symmetric** recovery wrap (AES-256-GCM); the rule is HPKE for public-key targets, AES-256-GCM for symmetric keys (§6.2).
 
-- To share a file to a user (account share), wrap an FK to the owner, or enroll a new device, the client fetches the recipient's **X25519 public key** from the directory ([13](13-sharing.md)) and HPKE-seals the payload to it. The result is the `wrapped_key`/`wrappedIdentityKey` blob stored server-side; only the recipient's device can `HybridDecrypt` it with the identity private key.
-- HPKE **suite must equal DHKEM(X25519, HKDF-SHA256) / HKDF-SHA256 / AES-256-GCM** — RFC 9180 IDs `KEM=0x0020`, `KDF=0x0001`, `AEAD=0x0002`. Tink's HPKE templates must be configured to exactly this KEM/KDF/AEAD; a **conformance test wraps with Android-Tink and unwraps with the server's/desktop's HPKE (and vice-versa)** using fixed vectors ([18](18-build-ci-testing.md)). If Tink's defaults differ, configure explicit `HpkeParameters`.
-- **Recovery escrow uses AES-256-GCM, not HPKE** (DECISION — resolves the prior HPKE-vs-AES indecision). The recovery blob is the identity bundle (X25519 priv ‖ Ed25519 priv) sealed with **AES-256-GCM under the Argon2id-derived wrapping key** ([07 §7.4](07-key-and-device-management.md)). This follows the system rule (§6.2): HPKE only where the target is a public key; AES-256-GCM where the key is symmetric.
+- To share a file to a user (account share), wrap an FK to the owner, or enroll a new device, the client fetches the recipient's **hybrid public key (X25519 ‖ ML-KEM-768)** from the directory ([13](13-sharing.md)) and HPKE-seals the payload to it. The result is the `wrapped_key`/`wrappedIdentityKey` blob stored server-side; only the recipient's device can decrypt it with the hybrid identity private key.
+- HPKE **KEM is the hybrid X25519 + ML-KEM-768** (classical and PQC shared secrets concatenated), with **HKDF-SHA256 / AES-256-GCM** and HPKE base mode, at **NIST level 3**; the suite is pinned on the `alg_id` tag as `X25519MLKEM768` (§6.10). The wrap library must be configured to exactly this hybrid KEM/KDF/AEAD; a **conformance test wraps on Android and unwraps with the server's/desktop's HPKE (and vice-versa)** using fixed vectors ([18](18-build-ci-testing.md)). **Tink alone cannot produce this suite** (no ML-KEM); the hybrid HPKE comes from the dependency flagged in [02 §2.7](02-tech-stack-and-libraries.md).
+- **Recovery escrow uses AES-256-GCM, not HPKE** (DECISION — resolves the prior HPKE-vs-AES indecision). The recovery blob is the hybrid identity bundle (X25519 priv ‖ ML-KEM-768 priv ‖ Ed25519 priv ‖ ML-DSA-65 priv) sealed with **AES-256-GCM under the Argon2id-derived wrapping key** ([07 §7.4](07-key-and-device-management.md)). The recovery path stays **symmetric and un-peppered** — Argon2id over the recovery phrase, no PQC dimension. This follows the system rule (§6.2): HPKE only where the target is a public key; AES-256-GCM where the key is symmetric.
 
 ## 6.5 File keys
 
@@ -65,8 +67,8 @@ fun open(frame: ByteArray, fk: FileKeyHandle, kind: ObjectKind, fileId: Uuid): B
 
 ## 6.7 Signing & verifying (tamper detection)
 
-- The client **signs** its key-directory entry (its published X25519/Ed25519 public keys) and, where the protocol calls for it, CRDT updates / share grants with **Ed25519**, so peers can detect a relay that swaps keys or injects updates.
-- The client **verifies** Ed25519 signatures on directory entries it fetches before wrapping a share to them, and on relayed updates where signed. (Full key-transparency/safety-numbers is deferred to Phase 6, [13 §13.6](13-sharing.md); v1.0.0 trust is TLS + signature checks.)
+- The client **signs** its key-directory entry (its published hybrid public keys — X25519 ‖ ML-KEM-768 for wrap, Ed25519 ‖ ML-DSA-65 for signing) and, where the protocol calls for it, CRDT updates / share grants with the **hybrid Ed25519 + ML-DSA-65** dual signature, so peers can detect a relay that swaps keys or injects updates.
+- The client **verifies** the **hybrid Ed25519 + ML-DSA-65** signatures on directory entries it fetches before wrapping a share to them, and on relayed updates where signed; a signature verifies only if **both** halves check out. (Full key-transparency/safety-numbers is deferred to Phase 6, [13 §13.6](13-sharing.md); v1.0.0 trust is TLS + signature checks.)
 
 ## 6.8 Recovery-key derivation
 
@@ -80,7 +82,7 @@ fun open(frame: ByteArray, fk: FileKeyHandle, kind: ObjectKind, fileId: Uuid): B
 - **No homemade crypto.** Only the vetted libraries in [02 §2.7](02-tech-stack-and-libraries.md), behind the `CryptoEngine` interface for agility.
 - **Constant-time** comparisons for tags/tokens (use library primitives).
 - **Zeroize** key material buffers after use where the JVM allows; prefer Keystore-backed handles for long-lived keys ([07](07-key-and-device-management.md)).
-- **Known-answer tests** for AES-GCM framing, HPKE wrap/unwrap, Ed25519, X25519, BLAKE3, and Argon2id, plus **cross-client conformance vectors** shared with server/desktop/web ([18 §18.5](18-build-ci-testing.md)). This is the single most important test surface in the app.
+- **Known-answer tests** for AES-GCM framing, **hybrid HPKE wrap/unwrap (X25519 + ML-KEM-768)**, **hybrid signatures (Ed25519 + ML-DSA-65)**, BLAKE3, and Argon2id, plus **cross-client conformance vectors** shared with server/desktop/web ([18 §18.5](18-build-ci-testing.md)). This is the single most important test surface in the app.
 
 ## 6.10 Group-key wrapping (enterprise/family groups)
 
@@ -90,9 +92,9 @@ Groups ([features/groups.md](https://github.com/Nyxite/Nyxite), [13 §13.7](13-s
 personal key  →  wraps  →  group key  →  wraps  →  DEK (FK)  →  encrypts  →  file
 ```
 
-- A **group keypair** is **X25519 (HPKE) + Ed25519**, generated **on-device** by the group creator (`core-crypto`, via Tink/libsodium — the same suite as identity keys, §6.2). Its **public** half is published as an HPKE target anyone may wrap to; its **private** half never leaves a member's device in the clear — it is stored **only wrapped**, once per member, under that member's personal X25519 public key.
+- A **group keypair** is **hybrid X25519 + ML-KEM-768 (HPKE) + hybrid Ed25519 + ML-DSA-65 (sign)**, generated **on-device** by the group creator (`core-crypto` — the same hybrid suite as identity keys, §6.2). Its **public** half is published as an HPKE target anyone may wrap to; its **private** half never leaves a member's device in the clear — it is stored **only wrapped**, once per member, under that member's personal hybrid public key.
 - **Unwrap path on this device**: HPKE-`HybridDecrypt` the wrapped **group private key** with the member's identity private key → then HPKE-unwrap each **file DEK** wrapped to the group public key → then AES-256-GCM-`open` the content frame (§6.3). Two HPKE unwraps chained where a personal share is one.
 - **Wrap path**: to grant a group, HPKE-`HybridEncrypt` the FK to the **group public key** — a wrapped-key row whose principal is a group (per scope/generation), identical mechanics to an account share (§6.4), only the target is a group rather than a member. Wrapping needs only the group's *public* key from the directory, so a worker with no membership can still wrap to a managers group (the enterprise "manager reads all" path, §6.10).
-- **Same pinned suite, no exception**: both key-wraps (group-privkey-to-member and DEK-to-group) use **HPKE** `DHKEM(X25519,HKDF-SHA256)/HKDF-SHA256/AES-256-GCM` (`KEM 0x0020`, `KDF 0x0001`, `AEAD 0x0002`); content stays **AES-256-GCM**; signatures **Ed25519**. Group blobs verify against the **shared cross-client conformance vectors** exactly like member wraps (§6.9, [18 §18.5](18-build-ci-testing.md)).
-- **`alg_id`-tagged wrap format (crypto-agility)**: because one group key wraps *many* DEKs, it concentrates any future post-quantum blast radius, so every wrapped **group-key grant** blob carries an explicit **`alg_id`** identifying the wrap algorithm from day one, even though v1 ships classical. The grant shape is `group_id | scope_id | member_id | generation | alg_id | hpke_ct` (matches the pinned fixture P4.4-CORE-1); the DEK-to-group wrapped-key row carries the same agility tag. The client refuses an `alg_id` it does not understand rather than misreading it, mirroring the frame-`version` rule (§6.3).
+- **Same pinned suite, no exception**: both key-wraps (group-privkey-to-member and DEK-to-group) use the **hybrid HPKE** suite `X25519MLKEM768` (KEM = X25519 + ML-KEM-768, HKDF-SHA256, AES-256-GCM, NIST level 3); content stays **AES-256-GCM**; signatures are the **hybrid Ed25519 + ML-DSA-65** dual signature. Group blobs verify against the **shared cross-client conformance vectors** exactly like member wraps (§6.9, [18 §18.5](18-build-ci-testing.md)).
+- **`alg_id`-tagged wrap format (crypto-agility)**: because one group key wraps *many* DEKs, it concentrates blast radius, so every wrapped **group-key grant** blob carries an explicit **`alg_id`** identifying the wrap algorithm. v1.0.0 pins the hybrid suite id `X25519MLKEM768`; the grant shape is `group_id | scope_id | member_id | generation | alg_id | hpke_ct` (matches the pinned fixture P4.4-CORE-1); the DEK-to-group wrapped-key row carries the same agility tag. Because wraps cover only the **small** keys, a future primitive change re-wraps them **without re-encrypting content ciphertext**. The client refuses an `alg_id` it does not understand rather than misreading it, mirroring the frame-`version` rule (§6.3).
 - **Zero-knowledge unchanged**: the server holds only the opaque grant blobs, DEK-to-group wraps, and membership rows — never a group private key, a group key generation, or any content key. All group wrap/unwrap happens on-device (P4.4-AND-1).

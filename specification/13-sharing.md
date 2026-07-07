@@ -4,8 +4,8 @@ Two-layer model ([server 09](https://github.com/Nyxite/NyxiteServer)): a **serve
 
 ## 13.1 Account share (user grant)
 
-1. The sharer enters/looks up the grantee (by email/userId). The client fetches the grantee's **public keys** from the directory: `GET /keys/directory?email=` (cache as `DirectoryKeyEntity`, [04](04-local-data-model.md)); verify the entry's Ed25519 self-signature ([06 §6.7](06-cryptography.md)).
-2. The client **HPKE-wraps the file key** to the grantee's X25519 public key.
+1. The sharer enters/looks up the grantee (by email/userId). The client fetches the grantee's **hybrid public keys** from the directory: `GET /keys/directory?email=` (cache as `DirectoryKeyEntity`, [04](04-local-data-model.md)); verify the entry's **hybrid Ed25519 + ML-DSA-65** self-signature ([06 §6.7](06-cryptography.md)).
+2. The client **HPKE-wraps the file key** to the grantee's **hybrid X25519 + ML-KEM-768** public key (§6.2).
 3. `POST /shares` with `{ targetType, targetId, kind: user_grant, granteeId, permission: read|write }` and `POST /files/{id}/keys` (or the combined create-share payload) carrying the **wrapped key**.
 4. The grantee's device later `GET /files/{id}/keys` → unwraps with its identity private key → can decrypt.
 5. For a folder/project target, the relevant per-file keys are wrapped to the grantee (batched/lazily) so the subtree decrypts.
@@ -38,7 +38,7 @@ The server stores only the opaque wrapped blob; it never sees the FK.
 
 ## 13.6 Trust & limits (v1.0.0)
 
-- Directory trust is **TLS + Ed25519 self-signature** on entries; **key transparency / safety-number verification is deferred to Phase 6**. Until then, surface the grantee's key fingerprint so cautious users can compare out-of-band.
+- Directory trust is **TLS + hybrid Ed25519 + ML-DSA-65 self-signature** on entries; **key transparency / safety-number verification is deferred to Phase 6**. Until then, surface the grantee's key fingerprint so cautious users can compare out-of-band.
 - The client respects server rate limits on `GET /keys/directory`, `POST /shares`, and `/share/{token}` access (`429` backoff, [05](05-api-client.md)).
 - Fragment keys (≥256-bit) and link tokens (≥128-bit) are generated with a CSPRNG; the app warns that links in chat/history can leak the fragment, so prefer account shares for sensitive material and use short expiries for links.
 

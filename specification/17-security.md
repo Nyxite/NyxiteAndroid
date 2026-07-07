@@ -8,7 +8,8 @@ The server-side threat model is covered by [server 13](https://github.com/Nyxite
 |--------|------------|
 | Lost/stolen unlocked device | App lock (biometric/device credential), secure window, short auto-lock timeout. |
 | Lost/stolen device at rest | Keystore/StrongBox-wrapped DB master + identity keys; SQLCipher; cache in `noBackupFilesDir`. |
-| Malicious/curious server or operator | E2EE: only ciphertext leaves the device; BLAKE3 verify on download; Ed25519 verify on directory entries/updates. |
+| Malicious/curious server or operator | E2EE: only ciphertext leaves the device; BLAKE3 verify on download; hybrid Ed25519 + ML-DSA-65 verify on directory entries/updates. |
+| Harvest-now-decrypt-later (future quantum adversary) | Every asymmetric seam is **hybrid classical + PQC** at v1.0.0 — HPKE key-wrap uses X25519 + ML-KEM-768; signatures use Ed25519 + ML-DSA-65 (NIST level 3, [06 §6.2](06-cryptography.md)) — so the server's indefinitely-stored wrapped keys stay confidential unless **both** halves break. |
 | Tampering/withholding relay | Content-address verification + signature checks; updates that don't verify are rejected. |
 | Backup exfiltration | `allowBackup=false` or strict backup rules excluding DB/cache/keys. |
 | Screenshot/screen-record/overview thumbnail | `FLAG_SECURE` on sensitive windows (configurable). |
@@ -55,4 +56,4 @@ The server-side threat model is covered by [server 13](https://github.com/Nyxite
 
 - Already-downloaded content can't be recalled after a share revocation (rotation only protects future content, [13 §13.5](13-sharing.md)).
 - A rooted/compromised device can defeat at-rest protections; the app raises the bar (Keystore/StrongBox, biometric) but cannot fully protect against a privileged on-device attacker.
-- v1.0.0 directory trust is TLS + Ed25519 signatures, not full key transparency ([13 §13.6](13-sharing.md)); deferred to Phase 6.
+- v1.0.0 directory trust is TLS + hybrid Ed25519 + ML-DSA-65 signatures, not full key transparency ([13 §13.6](13-sharing.md)); deferred to Phase 6.

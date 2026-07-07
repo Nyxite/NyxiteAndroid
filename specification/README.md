@@ -28,7 +28,7 @@ The client-side burden is real and deliberate: search and offline reach are boun
 | 03 | [project-structure.md](03-project-structure.md) | Gradle module graph, package layout, naming |
 | 04 | [local-data-model.md](04-local-data-model.md) | Room schema, encrypted-at-rest DB, sync state, FTS |
 | 05 | [api-client.md](05-api-client.md) | REST client, DTO mapping, error/retry, idempotency, TLS |
-| 06 | [cryptography.md](06-cryptography.md) | AEAD, HPKE, Ed25519/X25519, BLAKE3, Argon2id, framing, Tink mapping |
+| 06 | [cryptography.md](06-cryptography.md) | AEAD, hybrid HPKE (X25519+ML-KEM-768), hybrid signatures (Ed25519+ML-DSA-65), BLAKE3, Argon2id, framing, library mapping |
 | 07 | [key-and-device-management.md](07-key-and-device-management.md) | Identity keypair, device enrollment, recovery key, Keystore/StrongBox |
 | 08 | [sync-engine.md](08-sync-engine.md) | Manifest/delta sync, policies, CRDT/LWW split, WorkManager |
 | 09 | [realtime-collaboration.md](09-realtime-collaboration.md) | SignalR relay, yrs (UniFFI) merge, awareness, guests, snapshots |

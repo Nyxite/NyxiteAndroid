@@ -72,13 +72,14 @@ All primitives must match the server's algorithm table ([server 07 §7.3](https:
 
 | Purpose | Library | Notes |
 |---------|---------|-------|
-| AEAD (AES-256-GCM), HPKE (X25519+HKDF-SHA256+AES-256-GCM), Ed25519, X25519 | **Google Tink (Android)** | First-class HPKE and signature/hybrid primitives; integrates with Android Keystore for key wrapping. **Validate Tink's HPKE suite IDs match the server's exactly** ([06 §6.4](06-cryptography.md)). |
+| AEAD (AES-256-GCM), classical X25519 / Ed25519 halves | **Google Tink (Android)** | Handles the AES-GCM content path and the **classical** halves of the hybrid asymmetric suite; integrates with Android Keystore for key wrapping. |
+| **Hybrid HPKE (X25519 + ML-KEM-768) and hybrid signatures (Ed25519 + ML-DSA-65)** — NIST level 3 | **⚠ FOLLOW-UP / DEPENDENCY — not yet chosen.** Needs a **hybrid-capable HPKE + hybrid-signature (PQC) library** on Android/Kotlin/JNI. **Tink does NOT provide ML-KEM or ML-DSA**, so this is a required new dependency. | Post-quantum hybrid ships at **v1.0.0** ([06 §6.2](06-cryptography.md)), so it cannot be deferred. Candidate paths (choose at impl time, **do not assume either yet**): expose ML-KEM-768/ML-DSA-65 through the **existing Rust core over UniFFI** (per [#12](19-open-questions.md) the app already wraps `yrs`/`yffi` via UniFFI — a Rust PQC crate could ride the same JNI bridge), **or** a JVM PQC library. Whatever is chosen must produce the **exact hybrid suite `X25519MLKEM768`** and interop byte-for-byte with the server/desktop/web via shared conformance vectors ([18 §18.5](18-build-ci-testing.md), [06 §6.4](06-cryptography.md)). |
 | BLAKE3-256 (content addressing) | **A maintained BLAKE3 JVM/Kotlin lib** (e.g. a JNI or pure-Kotlin BLAKE3) | Confirmed dependency (approach settled); not in Tink. The specific artifact is chosen at impl time — pick one with test vectors and benchmark for large blobs. |
 | Argon2id (recovery-key derivation) | **argon2-jvm** (`de.mkammerer:argon2-jvm`, libsodium JNI) or equivalent | Confirmed dependency (approach settled). Parameters come from `recovery_blobs.kdf_params`; verify constant-time and arm64 binaries. |
 | Hardware-backed key storage | **Android Keystore** (`AndroidKeyStore` provider) + **StrongBox** when available | Wraps the DB master key and the identity-key store ([07](07-key-and-device-management.md)). |
 | Biometric unlock | **`androidx.biometric`** | Gate app/key unlock with device credential/biometric ([17](17-security.md)). |
 
-> Crypto-agility: the encrypted frame carries `version` and `key_id`/generation, so primitives can be rotated without a format break ([06 §6.3](06-cryptography.md)). Wrap every primitive behind the `CryptoEngine` interface so a library can be swapped without touching repositories.
+> Crypto-agility: the encrypted frame carries `version` and `key_id`/generation and every wrap carries an `alg_id` (v1.0.0 pins the hybrid suite `X25519MLKEM768`), so primitives can be rotated by re-wrapping only the small keys without touching content ([06 §6.2](06-cryptography.md), [§6.3](06-cryptography.md)). Wrap every primitive behind the `CryptoEngine` interface so the hybrid-PQC library above can be swapped without touching repositories.
 
 ## 2.8 CRDT
 

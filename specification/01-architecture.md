@@ -23,7 +23,7 @@ It follows a **Clean-architecture layering** with a **unidirectional data flow (
 │   • LocalStore (Room/SQLCipher)   ← single source of truth        │
 │   • ApiClient (Retrofit/OkHttp)   ← REST over ciphertext          │
 │   • RelayClient (SignalR)         ← encrypted CRDT relay          │
-│   • CryptoEngine (Tink + BLAKE3 + Argon2) ← all encryption        │
+│   • CryptoEngine (Tink + hybrid-PQC lib + BLAKE3 + Argon2) ← all encryption │
 │   • CrdtEngine (yrs via UniFFI)   ← text merge                    │
 │   • KeyStoreVault (Android Keystore/StrongBox) ← key material     │
 │   • BlobCache (filesystem)        ← cached ciphertext/plaintext   │
@@ -73,7 +73,7 @@ Repository interfaces (`FileRepository`, `StructureRepository`, `KeyRepository`,
 | `LocalStore` | Single source of truth for structure, sync state, cached plaintext metadata, FTS index | Room over SQLCipher ([04](04-local-data-model.md)) |
 | `ApiClient` | Typed REST over `/api/v1`, ciphertext bodies, problem+json errors, idempotency | Retrofit + OkHttp + kotlinx.serialization ([05](05-api-client.md)) |
 | `RelayClient` | SignalR `RelayHub` connection, join/submit/awareness, reconnect | microsoft-signalr Java client ([09](09-realtime-collaboration.md)) |
-| `CryptoEngine` | seal/open framed objects, HPKE wrap/unwrap, sign/verify, content address, recovery KDF | Tink + BLAKE3 + Argon2 ([06](06-cryptography.md)) |
+| `CryptoEngine` | seal/open framed objects, hybrid HPKE wrap/unwrap, hybrid sign/verify, content address, recovery KDF | Tink (AES-GCM + classical halves) + hybrid-PQC lib (ML-KEM-768 / ML-DSA-65, [02 §2.7](02-tech-stack-and-libraries.md)) + BLAKE3 + Argon2 ([06](06-cryptography.md)) |
 | `CrdtEngine` | Apply/encode Yrs updates, state vectors, snapshots | yrs via UniFFI ([09](09-realtime-collaboration.md)) |
 | `KeyStoreVault` | Wrap/unwrap the DB master key & identity-key store under a Keystore-held key | Android Keystore / StrongBox ([07](07-key-and-device-management.md)) |
 | `BlobCache` | Store/evict cached ciphertext and decrypted blobs (ink/binary) | App-private filesystem ([16](16-offline-and-storage-policies.md)) |

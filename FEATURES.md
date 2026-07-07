@@ -46,7 +46,7 @@ Kotlin + Jetpack Compose client. Native, chosen for S-Pen stylus pressure/tilt a
 
 ## Encryption & keys
 
-- On-device AES-256-GCM content encryption; HPKE wrap/unwrap of file keys
+- On-device AES-256-GCM content encryption; **post-quantum hybrid HPKE** (X25519 + ML-KEM-768) wrap/unwrap of file keys and **hybrid signatures** (Ed25519 + ML-DSA-65), NIST level 3, at v1.0.0
 - Device enrollment and identity-key handling; recovery via the user's recovery phrase unwrapping the client-encrypted recovery blob; keys protected by the platform keystore where possible
 
 ## Authentication
