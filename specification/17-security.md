@@ -57,3 +57,11 @@ The server-side threat model is covered by [server 13](https://github.com/Nyxite
 - Already-downloaded content can't be recalled after a share revocation (rotation only protects future content, [13 §13.5](13-sharing.md)).
 - A rooted/compromised device can defeat at-rest protections; the app raises the bar (Keystore/StrongBox, biometric) but cannot fully protect against a privileged on-device attacker.
 - v1.0.0 directory trust is TLS + hybrid Ed25519 + ML-DSA-65 signatures, not full key transparency ([13 §13.6](13-sharing.md)); deferred to Phase 6.
+
+## 17.9 Support plane — the one consensual non-E2EE exception
+
+In-app bug reporting ([15 §15.7](15-ui-and-navigation.md)) runs on the project's **single, deliberate exception to zero-knowledge**: a **consensual, non-E2EE support plane** that a user enters only by an explicit action, provably **disjoint from the content plane** (SUP-1). It is safe because it does not weaken content E2EE:
+
+- A report carries **no content key and no content-plane ciphertext** — only the free text, the redacted screenshot, and a user-reviewed diagnostic envelope; the content-plane zero-knowledge guarantee is **untouched**. The load-bearing protections here are the explicit non-E2EE + "goes to the Nyxite maintainer" notice + GDPR shown before send, and the user's own redaction — **not** encryption (reports are stored server-readable by the maintainer, SUP-1/SUP-8).
+- **Screenshot redaction is destructive and client-side (SUP-2):** black-box + blur are **flattened into the pixels (re-encoded PNG, EXIF stripped) before upload**; the original image and any redaction mask are **never sent** — no peel-back layer. Capturing the current view for a report is a deliberate self-capture the user initiates, distinct from the `FLAG_SECURE` screenshot-blocking above.
+- The client **never contacts the helpdesk directly**; it relays through its own `NyxiteServer` as an authenticating relay (SUP-7). Detail: master feature [support.md](https://github.com/Nyxite/Nyxite), [NyxiteSupport `specification/02`](https://github.com/Nyxite/NyxiteSupport), [OPEN-DECISIONS SUP-1–SUP-9](https://github.com/Nyxite/Nyxite).
