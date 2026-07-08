@@ -41,9 +41,10 @@ Type-safe Navigation-Compose with `@Serializable` routes. Top-level destinations
 
 ## 15.4 Theming & brand
 
-- Material 3 with a Nyxite color scheme; dynamic color optional. Dark theme first-class (notes app, night use; fits the "Nyx" night branding).
+- Material 3 color scheme **generated from `NyxiteDesign`'s `nyxite-tokens.json`** (deep-purple accent — #4C1D95 light / #8B5CF6 dark — via generated `colors.xml` + `values-night` consumed by `MaterialTheme`; [02 §2.2](02-tech-stack-and-libraries.md), [03 §3.5](03-project-structure.md)); dynamic color optional. Dark theme first-class (notes app, night use; fits the "Nyx" night branding).
 - App icon and adaptive foreground from `Nyxite/icons/android` ([03 §3.5](03-project-structure.md)).
-- Typography legible for long-form reading and code; respect system font scaling.
+- **Implements the shared NyxiteDesign system** ([OPEN-DECISIONS DS](https://github.com/Nyxite/Nyxite/blob/main/docs/OPEN-DECISIONS.md)): **Layer A** = the tokens + standard Material 3 composables; **Layer B** = the app shell/editor (doc-type switcher, toolbar densities, canvas). Several Layer-B shell primitives map directly onto stock Compose M3 — `NavigationRail`, `SegmentedButton`, assist/filter chips, `NavigationBar` (bottom tab), and `FloatingActionButton` — so build on those rather than reinventing them.
+- Typography from the tokens — **Manrope** (UI) + **Source Serif 4** (document content) — legible for long-form reading and code; respect system font scaling. **Fonts and all assets are bundled/self-hosted in the app** (bundled font resources); **never** use Android's downloadable-fonts mechanism or any Google Fonts / external CDN at runtime — it leaks IP/timing and is incompatible with the no-Google, zero-knowledge stance ([17](17-security.md)).
 
 ## 15.5 Accessibility & input
 

@@ -83,6 +83,7 @@ Provide reusable Gradle plugins so each module's build file is a few lines:
 ## 3.5 Resource & asset strategy
 
 - Icons ship from the master [`Nyxite/icons/android`](https://github.com/Nyxite/Nyxite) set (`mipmap-*`, adaptive `ic_launcher_foreground`, Play Store icon). Wire them in `app`.
+- **Design-system color resources are generated, not hand-edited.** `res/values/colors.xml` and `res/values-night/colors.xml` (plus any Compose `Color` constants) are **build outputs** of the CI token-build pipeline that reads `NyxiteDesign`'s `nyxite-tokens.json`; the `MaterialTheme` color scheme in `core-ui` consumes them ([02 §2.2](02-tech-stack-and-libraries.md), [OPEN-DECISIONS DS](https://github.com/Nyxite/Nyxite/blob/main/docs/OPEN-DECISIONS.md)). Never edit these by hand. Fonts (Manrope, Source Serif 4) ship as **bundled font resources** in-app — never via Android downloadable fonts or any external CDN ([15 §15.4](15-ui-and-navigation.md)).
 - Strings centralized for future localization; no user content in resources.
 - Conformance test vectors (CRDT wire, crypto KATs) live under `core-crdt/src/test/resources` and `core-crypto/src/test/resources` ([18](18-build-ci-testing.md)).
 

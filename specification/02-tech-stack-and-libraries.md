@@ -23,6 +23,8 @@ Concrete choices with rationale. Versions are **[P]** floors at time of writing;
 | Image loading | **Coil 3** | Thumbnails/avatars (decoded from decrypted bytes only). |
 | Markdown render | **Markwon** (Android views via `AndroidView`) | View-mode rendering ([10](10-editors.md)); chosen for v1.0.0 as the mature, battle-tested option. A Compose-native renderer is a later swap once that ecosystem matures. |
 
+> Design tokens (shared source of truth): colors, typography, spacing, radius, shadow, and motion are **not hand-defined here** — they derive from the platform-agnostic `nyxite-tokens.json` in the shared [`NyxiteDesign`](https://github.com/Nyxite/NyxiteDesign) system. A CI token-build pipeline generates the Android artifacts (`res/values/colors.xml` + `res/values-night/colors.xml`, optionally Compose `Color` constants; [03 §3.5](03-project-structure.md)) that the `MaterialTheme` color scheme consumes, so this client never drifts from the brand (deep-purple accent, Manrope UI + Source Serif 4 document type; [15 §15.4](15-ui-and-navigation.md)). See the master tracker's Live decision [OPEN-DECISIONS DS](https://github.com/Nyxite/Nyxite/blob/main/docs/OPEN-DECISIONS.md).
+
 ## 2.3 Ink / stylus (the differentiator)
 
 | Concern | Choice | Rationale |
