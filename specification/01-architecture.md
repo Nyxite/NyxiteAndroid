@@ -84,7 +84,7 @@ Repository interfaces (`FileRepository`, `StructureRepository`, `KeyRepository`,
 - **Threading**: Kotlin coroutines + `Flow`. A small set of dispatchers via an injected `DispatcherProvider`: `Main` (UI), `Default` (CRDT merge, diff, crypto-bound CPU), `IO` (DB, network, file). Crypto on `Default`; never on `Main`.
 - **Active editing/collaboration**: while a document is open, a **foreground service** (`CollabService`, type `dataSync`) maintains the SignalR connection and shows a low-priority notification, so the relay survives brief backgrounding.
 - **Periodic/opportunistic sync**: `WorkManager` jobs — `DeltaSyncWorker` (constraint: network; periodic + expedited on app foreground), `BlobPrefetchWorker` (keep-on-device content; constraint: unmetered/charging configurable), `ReindexWorker`, `KeyRotationWorker`. See [08](08-sync-engine.md) and [16](16-offline-and-storage-policies.md).
-- **Snapshotting**: a client trigger (N updates / time / graceful leave) enqueues `SnapshotWorker` to compact the local Yrs doc into an encrypted snapshot and upload it ([09 §5.6](09-realtime-collaboration.md), [12](12-version-history.md)).
+- **Snapshotting**: a client trigger (N updates / time / graceful leave) enqueues `SnapshotWorker` to compact the local Yrs doc into an encrypted snapshot and upload it ([09 §9.6](09-realtime-collaboration.md), [12](12-version-history.md)).
 
 ## 1.7 Error & connectivity model
 

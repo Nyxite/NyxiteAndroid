@@ -58,7 +58,7 @@ Every screen defines explicit loading, empty (no projects/files/results), offlin
 
 ## 15.7 Bug reporting & support
 
-In-app bug reporting routing to the maintainer-run `NyxiteSupport` helpdesk. This runs on the project's **one deliberate, consensual non-E2EE support plane**, disjoint from the content plane — see [17 §17.9](17-security.md), the master feature [support.md](https://github.com/Nyxite/Nyxite), the [NyxiteSupport `specification/02`](https://github.com/Nyxite/NyxiteSupport), and [OPEN-DECISIONS SUP-1–SUP-9](https://github.com/Nyxite/Nyxite).
+In-app bug reporting routing to the maintainer-run `NyxiteSupport` helpdesk. This runs on the project's **one deliberate, consensual non-E2EE support plane**, disjoint from the content plane — see [17 §17.9](17-security.md), the master feature [support.md](https://github.com/Nyxite/Nyxite), the [NyxiteSupport `specification/02`](https://github.com/Nyxite/NyxiteSupport), and [OPEN-DECISIONS SUP-1–SUP-13](https://github.com/Nyxite/Nyxite).
 
 - **Capability-gated surface (SUP-9).** The **"Report a bug"** entry (in the nav drawer / `About` / help affordances) and the **"My tickets"** view appear **only when the server advertises the `support.enabled` capability flag** (v1 = the maintainer's official instance(s) only). Where the flag is absent the surfaces are **simply absent** — no disabled control, no hint.
 - **Report composer.** Free-text **title + description**, plus an optional screenshot and the diagnostic envelope below.
