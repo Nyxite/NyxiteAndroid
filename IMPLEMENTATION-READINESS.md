@@ -40,9 +40,9 @@ To calibrate the gaps, these are genuinely sufficient to code against:
 - *Need:* server auth endpoint schemas + the WebAuthn RP config for the instance.
 
 **HB-3 (cross-cutting acceptance) — The shared cross-client conformance vectors do not exist yet.**
-- *What's missing:* P0.1-CORE-2/-3 require authoring the shared **crypto KAT/cross-client vectors** and **CRDT wire vectors**, "checked into every repo's test resources." The Android repo contains **no `core-crypto`/`core-crdt` test-resource vectors** (no code exists yet). The frame/primitive *formats* are pinned (so the Android side is codeable), but "**byte-for-byte interop enforced by shared conformance vectors**" — the non-negotiable acceptance bar (P0.1-TC-1, and every later `*-CORE-*` fixture) — cannot be met without the co-owned vector set and the counterpart implementations to interop-test against.
+- *What's missing:* P0.1-CORE-2/-3 require authoring the shared **crypto KAT/cross-client vectors**, **CRDT/Yrs wire vectors**, and — as the same co-owned set matures — the **ink round-trip vectors** (HB-6), "checked into every repo's test resources." The Android repo contains **no `core-crypto`/`core-crdt` test-resource vectors** (no code exists yet). The frame/primitive *formats* are pinned (so the Android side is codeable), but "**byte-for-byte interop enforced by shared conformance vectors**" — the non-negotiable acceptance bar (P0.1-TC-1, and every later `*-CORE-*` fixture) — cannot be met without the co-owned vector set and the counterpart implementations to interop-test against.
 - *Blocks:* the *acceptance/exit* of every phase (interop is the gating invariant), even though local code can be written.
-- *Need:* the shared vector files, co-authored with server/desktop/web, plus the reference implementations to round-trip against.
+- *Need:* the shared vector files (crypto KAT, CRDT/Yrs wire, ink round-trip), co-authored with server/desktop/web, plus the reference implementations to round-trip against.
 
 ### Phase 1.1 / 1.2 — Sync
 
@@ -83,7 +83,8 @@ These do not block writing code but must be resolved to finish/ship the relevant
 - **yrs (UniFFI) integration + conformance spike** (P0.1-CORE-1) — approach *decided*, but the go/no-go spike (NDK ABIs, JNA runtime, 200k-char benchmark, byte-identical encoded updates) is unrun. Risk, not missing info.
 - **Hardware spikes** — StrongBox availability/limits across OEMs, biometric validity-window behavior straddling WorkManager runs, final Argon2id tuning on a device trio, S-Pen latency/pressure fidelity (P0.1-TC-8, P3.1-TC-1 are explicitly "hardware-gap" cases). Must be run on real devices; can't be closed from docs.
 - **Passkey UX specifics** on Credential Manager (registration vs assertion flows) beyond the high-level description.
-- **BLAKE3 / Argon2id concrete artifacts** — the spec deliberately leaves the exact JVM library "chosen at impl time." A normal engineering choice, not a blocker.
+- **BLAKE3 / Argon2id concrete artifacts** — the approach is settled; the spec deliberately leaves the exact JVM library "chosen at impl time." A normal engineering choice, not a blocker.
+- **Hybrid-PQC library is not yet chosen** — the ML-KEM-768 / ML-DSA-65 primitives for the hybrid post-quantum path have **no ready JVM implementation** (Tink lacks both). The candidate is a Rust PQC crate carried over the existing UniFFI bridge (alongside yrs) or a JVM PQC library, decided at impl time. This blocks *shipping* the hybrid-PQC hardening surface, not the earlier phases; it is a library/integration choice deferred to implementation, not a missing contract.
 - **Internal seams left to the implementer** (`FileKeyHandle` representation, exact UniFFI `.udl`/proc-macro surface, `DispatcherProvider` wiring) — expected implementation freedom, not gaps.
 
 ---
