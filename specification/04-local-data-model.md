@@ -48,6 +48,11 @@ IDs are server-issued **UUIDv7** strings; created-on-device rows generate a UUID
 
 Indexes: `projectId`, `folderId`, `ownerId`, `syncState`, `keepOnDevice`, `(keepOnDevice, lastOpenedAt)`. Effective keep-on-device is resolved by walking `file.keepOnDevice` → nearest ancestor `keepOnDeviceDefault` → account default (not kept).
 
+### StructureKeyEntity (wrapped project and folder keys)
+`id` (TEXT PK), `projectId?`, `folderId?`, `keyId`, `generation`, `wrappedKey` BLOB (as received from the server), `algId`. Every project and every folder has its own key, which seals its name and metadata (OPEN-DECISIONS ST-1). Exactly one of `projectId` / `folderId` is set. Rows are filled from the `wrappedKey` that every structure response carries and from `POST /keys/lookup` ([05](05-api-client.md)). Whether a row exists for an object's current `keyGeneration` decides if the next read can ask for `keys=false`.
+
+- **Trash.** `ProjectEntity`, `FolderEntity` and `FileEntity` keep `deletedAt`. The Trash view is not derived from local rows but read from `GET /trash`, because only the server knows which rows a delete took along and until when an entry can be restored.
+
 ### FileKeyEntity (locally unwrapped/wrapped cache)
 `id` (TEXT PK, **UUIDv7 surrogate key** — mirrors the server C1 fix), `fileId`, `keyId`, `generation`, `memberId?`, `shareId?`, `wrappedKey` BLOB (as fetched from server, for re-upload/rotation), and a transient unwrapped handle that is **never persisted in plaintext** — the unwrapped FK is held only in memory / re-derived on demand via the identity key.
 

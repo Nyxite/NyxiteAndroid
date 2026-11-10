@@ -27,11 +27,16 @@ Implements the server REST surface ([server 04](https://github.com/Nyxite/Nyxite
 Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaque byte streams; *(json)* are metadata DTOs with `nameEnc`/`metadataEnc` carried as base64/byte fields.
 
 ### StructureApi
-- `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}` *(json, `nameEnc`)*
-- `GET /projects/{id}/folders`
-- `POST/GET/PATCH/DELETE /folders`, `/folders/{id}` *(json, `nameEnc`,`parentFolderId`)*
+- `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}` *(json: `nameEnc`,`metadataEnc`,`syncPolicy`)*
+- `GET /projects/{id}/folders` *(all folders of the project, flat; the tree is built from `parentFolderId`)*
+- `GET /projects/{id}/files` *(all files of the project, flat; `folderId` null = project root)*
+- `POST/GET/PATCH/DELETE /folders`, `/folders/{id}` *(json: `nameEnc`,`metadataEnc`,`parentFolderId`,`syncPolicy`)*
 - `GET /folders/{id}/files`
 - `POST/GET/PATCH/DELETE /files`, `/files/{id}` *(json: `nameEnc`,`contentType`,`syncPolicy`,`parentFolderId`,`metadataEnc`,`crdtDocId`)* — `POST` sets `contentType` (**immutable**) and the client-allocated `crdtDocId` (UUIDv7; required for text types, null otherwise); `PATCH` updates **only** `nameEnc`, `syncPolicy`, `parentFolderId` (move), `metadataEnc`. `syncPolicy` is the two-value enum `server-default`|`excluded` only.
+- **Creates carry a client-allocated `id` and `ownerWrappedKey`** (OPEN-DECISIONS ST-1, ST-2). The client generates the UUIDv7 of every new project, folder and file, generates that object's own 32-byte key, seals `nameEnc`/`metadataEnc` with it (the id goes into the frame AAD, [06](06-cryptography.md)) and sends the key wrapped to its own identity key. A taken `id` answers `409 conflict`. Because ids are known before the request, a folder and the files inside it can be created offline and replayed from the outbox in order without rewriting ids.
+- **`PATCH` and `null`.** A field that is left out stays unchanged. `parentFolderId: null` moves to the project root, `metadataEnc: null` clears it, a folder's `syncPolicy: null` follows its parent. `syncPolicy` on a project or folder is only the default for what is created inside, the server enforces the value on each file.
+- **Wrapped keys arrive with the objects.** Every returned project, folder and file carries `wrappedKey`, the caller's wrap of the object's current key, so a first listing needs no key requests. A client whose key cache is warm adds `?keys=false` to any structure read and saves about 1.6 KB per object. Keys it then misses come from `POST /keys/lookup` *(json: `projectIds`,`folderIds`,`fileIds`, at most 500 ids in total)*, which returns all live generations per object. `GET /projects/{id}/keys` and `GET /folders/{id}/keys` return the keys of one object, like `GET /files/{id}/keys`.
+- **Trash.** `DELETE` moves an object to Trash, a folder with its subtree and a project with everything in it. `GET /trash` lists what the user deleted directly, newest first, each entry with the object, `restorableUntil` and the counts of folders and files that went along. `POST /trash/projects/{id}/restore`, `/trash/folders/{id}/restore` and `/trash/files/{id}/restore` bring an entry back together with what went along. When the project or the folder it lies in is itself in Trash the server answers `409 conflict`, and the UI offers to restore that one first. After `restorableUntil` the entry is gone from the list and only an admin can restore it.
 
 ### FileContentApi
 - `GET /files/{id}/blob` *(ciphertext stream; supports `If-None-Match: <contentHash>`)*
