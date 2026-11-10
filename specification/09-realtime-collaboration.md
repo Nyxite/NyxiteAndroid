@@ -14,7 +14,7 @@ Live multi-user editing of text documents over an **encrypted relay**: the serve
 ## 9.2 Transport
 
 - **SignalR over WebSocket**, single hub `RelayHub`, groups keyed `file:{fileId}`. Use the `com.microsoft.signalr` Java client wrapped behind `RelayClient`, bridging its RxJava API to coroutines/Flow.
-- **Upgrade auth**: the server's access token (bearer) for users; a short-lived **share token** for guests ([14](14-authentication.md)). The token authorizes *relay access*; the **decryption key never comes from the server** (it is the user's unwrapped FK, or the guest's fragment key).
+- **Upgrade auth**: the server's access token (bearer) for users; a short-lived **share token** for guests ([14](14-authentication.md)). The token authorizes *relay access*; the **decryption key never comes from the server** (it is the user's unwrapped FK, or the guest's fragment key). The native SignalR client sends the bearer as the `Authorization` header of the upgrade, so it needs no socket ticket. The ticket of `POST /auth/socket-ticket` exists for browsers, which can only put a credential into the URL (server [08 §8.4](https://github.com/Nyxite/NyxiteServer)).
 - **Fallback**: when the socket is unavailable, use the REST encrypted-update endpoints ([08 §8.4](08-sync-engine.md)).
 
 ## 9.3 Hub contract (client side)
