@@ -43,7 +43,9 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `PUT /files/{id}/blob` *(ciphertext; ink/binary LWW; `If-Match: <parentSeq>`)*
 - `GET /files/{id}/crdt/log?since={seq}` *(encrypted updates — REST fallback)*
 - `POST /files/{id}/crdt/log` *(submit encrypted update(s) — REST fallback)*
-- `GET /files/{id}/snapshot` *(latest encrypted snapshot pointer/stream)*
+- `GET /files/{id}/snapshot` *(latest encrypted snapshot stream; `Nyxite-Snapshot-Seq` = last update it contains)*
+- `PUT /files/{id}/snapshot` *(ciphertext; headers `Nyxite-Snapshot-Seq`, `Nyxite-Content-Hash`, `Nyxite-Key-Id`; becomes the head version; `409 conflict` when a newer snapshot is stored)*
+- **Content rules.** `If-Match` on `PUT /files/{id}/blob` is the version `seq` the edit is based on, `0` for the first. A lost write answers `409` with `winner` and `sibling`, the version the lost bytes were kept as. Every upload names the file's current key in `Nyxite-Key-Id`, a rotated-out key answers `412 key_generation_stale`. Each update in `POST /files/{id}/crdt/log` carries a client-chosen `clientUpdateId`, so a resend after a lost answer gets its old `seq` back. A text file has no blob upload and a blob file no update log.
 
 ### FileKeysApi
 - `GET /files/{id}/keys` *(caller's wrapped FK(s))*

@@ -2,6 +2,8 @@
 
 Live multi-user editing of text documents over an **encrypted relay**: the server stores and forwards encrypted CRDT updates but never merges or reads them; **the Android client runs the Yrs engine (yrs via UniFFI) and merges locally** ([server 05](https://github.com/Nyxite/NyxiteServer)). The engine is the reference Rust `yrs`/`yffi` core wrapped by UniFFI-generated Kotlin bindings; a short UniFFI integration + conformance spike validates it ([19](19-open-questions.md)).
 
+> **Relay contract additions (server 05, 2026-11-10).** The hub is at `/hubs/relay`. On join the server sends `OnSnapshot(fileId, crdtSeq, versionSeq)` when a snapshot exists, then the stored updates as `OnUpdates`. Every update stored later arrives as `OnUpdates` too, the client's own included, so the client applies the room's stream in `seq` order and drops what it already has. `SubmitUpdate` returns the assigned `seq`, which is the acknowledgement that the update is durable. A failed call carries the stable problem code as its message and is announced as `OnError`.
+
 ## 9.1 Components
 
 - **`CrdtEngine`** (`core-crdt`, yrs via UniFFI): holds the per-document Yrs doc, applies/encodes updates, computes state vectors, serializes snapshots.
