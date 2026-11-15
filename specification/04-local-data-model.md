@@ -60,7 +60,9 @@ Indexes: `projectId`, `folderId`, `ownerId`, `syncState`, `keepOnDevice`, `(keep
 - **Indices**: unique `(fileId, keyId, memberId)` scoped to `memberId IS NOT NULL`, and unique `(fileId, keyId, shareId)` scoped to `shareId IS NOT NULL`.
 
 ### FileVersionEntity
-`id` PK, `fileId`, `seq`, `contentHash` BLOB, `blobRef` TEXT, `sizeCipher`, `keyId`, `authorId?`, `createdAt`. Unique `(fileId, seq)`. Index `(fileId, seq DESC)`.
+`id` PK (local), `fileId`, `seq`, `contentHash` BLOB, `layout` (`single`/`chunked`), `sizeCipher`, `keyId`, `isHead` BOOL, `authorId?`, `restoredFromSeq?`, `crdtSeq?` (text snapshots), `createdAt`, `lwwLoser` BOOL (local). Unique `(fileId, seq)`. Index `(fileId, seq DESC)`.
+The columns mirror the server's version record, which carries no blob address, because the ciphertext is fetched by `seq` ([12 §12.1](12-version-history.md)).
+`lwwLoser` is set locally when a version arrives as the `sibling` of a `409` or with `isHead: false` in the change feed, because the record itself does not say that a version lost LWW ([12 §12.5](12-version-history.md)).
 
 ### CrdtUpdateEntity (local log mirror / outbox)
 `id` autogen, `crdtDocId`, `seq?` (null until server-assigned for outgoing), `updateEnc` BLOB, `keyId`, `authorId?`, `createdAt`, `direction` (`inbound`/`outbound`), `acked` BOOL. Backs offline catch-up and the submit outbox ([09](09-realtime-collaboration.md)).

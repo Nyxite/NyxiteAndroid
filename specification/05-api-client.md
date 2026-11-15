@@ -63,10 +63,13 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET/PUT /recovery` *(server-opaque escrow blob + `kdf_params`)*
 
 ### VersionsApi
-- `GET /files/{id}/versions` *(paginated, newest first)*
+- `GET /files/{id}/versions` *(`?cursor=&limit=`, newest first, `{ items, nextCursor }`)*
 - `GET /files/{id}/versions/{seq}` *(metadata)*
-- `GET /files/{id}/versions/{seq}/blob` *(ciphertext)*
+- `GET /files/{id}/versions/{seq}/blob` *(ciphertext, with `ETag` = quoted `contentHash`, `Nyxite-Key-Id` and `Nyxite-Blob-Layout`)*
 - `POST /files/{id}/restore` *(body `{ seq }` only; new head derived from version `seq`, [12 §12.4](12-version-history.md))*
+  It requires `Idempotency-Key`, and a retry reuses the key of the first attempt, so the audit is not doubled.
+  It answers `204`, `403 acl_denied` with read reach only, `404` for a seq the file does not have and `409 excluded_content` for a file excluded from sync.
+- There is no diff route, and the client never asks for one ([12 §12.3](12-version-history.md)).
 
 ### SharesApi
 - `GET /shares?targetType={file|folder|project}&targetId={id}` *(owner only)* and `GET /shares` without a target *(account shares granted to the caller)*
