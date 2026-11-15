@@ -59,6 +59,8 @@ The server can't compact an encrypted log. **The client periodically snapshots**
 - **Awareness** (cursor, selection, display label/color) is **encrypted** with the FK and relayed via `SubmitAwareness`/`OnAwareness`; **never persisted**. Rendered as remote carets/selections in the editor ([10](10-editors.md)).
 - **Presence roster** (`OnPresence`) shows who is in the room by account display name (from the user's account) or "guest"; no content. Rendered as avatar chips.
 - Throttle awareness emission (e.g. on cursor move, coalesced ~20–30 Hz max) to limit traffic and battery.
+  The server enforces its own budget of 60 awareness messages per second per connection (server 05 §5.5, 13 §13.5). A message beyond it fails with `rate_limited` and `OnError(fileId, "rate_limited", ...)`. The client drops that state without telling the user and keeps sending at its throttle, because the next state replaces the dropped one.
+- **Relay caps (server 05 §5.4).** A join answers `room_full` when the document already has 100 connections and `too_many_rooms` when this connection is in 50 documents. On `room_full` the editor stays offline-editable and retries the join with backoff, on `too_many_rooms` the client leaves documents it no longer shows before joining. A revoked share or a move to Trash now ends an open room at once with `OnError(not_found)` or, for a guest, `share_revoked`, instead of up to 30 s later.
 
 ## 9.8 Guest mode (this device joining a link share)
 

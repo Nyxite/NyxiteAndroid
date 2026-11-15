@@ -50,7 +50,8 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 ### FileKeysApi
 - `GET /files/{id}/keys` *(caller's wrapped FK(s))*
 - `POST /files/{id}/keys` *(upload wrapped FK(s) for members)*
-- `POST /files/{id}/keys/rotate` *(register new generation: re-wrapped keys + new head ciphertext ref)*
+- `PUT /files/{id}/keys/rotate/head` *(stage the head sealed with the new key; `Nyxite-Key-Id`, `Nyxite-Content-Hash`, and `Nyxite-Snapshot-Seq` or `If-Match`; `204`)*
+- `POST /files/{id}/keys/rotate` *(owner only: `{ newKeyId, generation, wrappedKeys[], newHeadRef, nameEnc, metadataEnc }` with `Idempotency-Key`, `newHeadRef` = content hash of the staged head; `409 conflict` lost, `409 version_conflict` head moved)*
 - `POST /files/keys:batch` *(subtree share fan-out: `{ grants: [ { fileId | folderId, keyId, memberId, wrappedKey, algId? } ] }`, at most 500, idempotent, per-item `applied`/`rejected` in request order — see [13](13-sharing.md))*
 
 ### KeysDevicesRecoveryApi

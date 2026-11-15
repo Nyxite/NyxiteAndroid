@@ -31,7 +31,7 @@ The fixtures `sharing.json` of P2.2-CORE-1 hold one request and response of each
   The guest relay `/share/{token}/ws` is WebSockets only and takes a single-use ticket per connection.
 - An unknown token is `404`, a revoked or expired one `410 share_revoked` or `410 link_expired`, and an open guest connection is closed with that code by the relay's re-check.
   Every `/share/{token}*` request counts against 30 per minute per IP, `POST /shares` against 30 per minute per user, and the client backs off on `429` by `Retry-After`.
-- `POST /files/{id}/keys/rotate` is Phase 2.3, so its fixture is pinned and the endpoint is not served yet.
+- `POST /files/{id}/keys/rotate` and the staged head `PUT /files/{id}/keys/rotate/head` are served since Phase 2.3, and `sharing.json` pins both requests (see the revocation section).
 
 ## 13.2 Link share (anonymous / guest)
 
@@ -54,8 +54,24 @@ The fixtures `sharing.json` of P2.2-CORE-1 hold one request and response of each
 ## 13.5 Revocation (two-layer)
 
 1. **Instant ACL cutoff**: `DELETE /shares/{id}` removes the grant; the removed member/link can no longer fetch ciphertext or join the relay — enforced at fetch/join/submit.
-2. **Forward-secrecy rotation**: the client (a remaining member) **rotates the file key** so future content is unreadable to the removed party ([07 §7.6](07-key-and-device-management.md)): new FK, re-encrypt head + new snapshot, re-wrap to remaining members, `POST /files/{id}/keys/rotate`. Runs in `KeyRotationWorker`; the file shows `Rotating`.
+2. **Forward-secrecy rotation**: the project owner's client **rotates the file key** so future content is unreadable to the removed party ([07 §7.6](07-key-and-device-management.md)): new FK, re-encrypt head + new snapshot, re-wrap to remaining members, `POST /files/{id}/keys/rotate`. Runs in `KeyRotationWorker`; the file shows `Rotating`.
 - The UI is honest: already-downloaded content can't be recalled; rotation protects only future edits.
+
+
+### Server contract pinned in Phase 2.3
+
+The server side of both layers is built ([server 09 §9.6](https://github.com/Nyxite/NyxiteServer)), and the fixtures `sharing.json` of P2.2-CORE-1 hold the staging request, the commit and their answers.
+
+- `DELETE /shares/{id}` cuts the removed member off at fetch, join and submit at once, and its open relay rooms end with `OnError(not_found)`, or `share_revoked` for a link guest, without waiting for the periodic re-check.
+  A logout or a revoked session or device closes that session's relay connections the same way.
+- Only the project owner rotates, because only the owner revokes other members, hands out keys and sees the member list, and a grantee's rotation attempt is `403 acl_denied`.
+- The rotation is write-then-swap: the client stages the new head with `PUT /files/{id}/keys/rotate/head` and the commit names it in `newHeadRef`, its base64url BLAKE3-256 content hash, so no member ever sees a head it cannot open.
+  `newHeadRef` is required when the file has a head, and a head that moved since staging is `409 version_conflict`, after which the client stages again.
+- The commit carries `nameEnc` and `metadataEnc` sealed with the new key, because listings carry only the wrap of the current generation.
+- `wrappedKeys` must wrap the new key to exactly the accounts that reach the file, the owner included, otherwise `400`, so the removed member gets no wrap of the new key.
+- The commit needs an `Idempotency-Key`, and its replay answers `204` again.
+- From the commit on, every update, snapshot and blob sealed with an older key is `412 key_generation_stale`, over REST and as `OnError(fileId, "key_generation_stale", ...)` on the relay, and the client re-seals and resubmits it with its stable client id.
+- Older versions and wraps stay readable to the members who had them, and a live link opens nothing written after the rotation until the owner replaces it.
 
 ## 13.6 Trust & limits (v1.0.0)
 
