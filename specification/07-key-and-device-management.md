@@ -55,27 +55,27 @@ Until enrolled with the identity private key, the device can authenticate and se
 
 ## 7.6 Key rotation & revocation (client-driven forward secrecy)
 
-When a share is revoked ([13](13-sharing.md)), the project owner's client rotates the FK so removed members cannot read **future** content:
+When a share is revoked ([13](13-sharing.md)), the client of any remaining member with write access rotates the FK so removed members cannot read **future** content:
 
 1. Generate a new FK (new `keyId`, `generation + 1`).
 2. Re-encrypt the current head under the new FK, a fresh snapshot for a text file, and stage it with `PUT /files/{id}/keys/rotate/head` (`Nyxite-Key-Id` = the new key, `Nyxite-Content-Hash`, and `Nyxite-Snapshot-Seq` for a text file or `If-Match` with the head seq for any other file).
    Seal the file's name and metadata again with the new FK.
-3. Re-wrap the new FK to every account that still reaches the file, the owner included, and to nobody else, because the server checks the set against the live shares.
-4. `POST /files/{id}/keys/rotate { newKeyId, generation, wrappedKeys[], newHeadRef, nameEnc, metadataEnc }` with an `Idempotency-Key`, where `newHeadRef` is the staged head's content hash; the server makes the staged head the head and bumps `key_generation` in one transaction.
+3. Re-wrap the new FK to every account `GET /files/{id}/keys/rotate/members` names, the owner included, and to nobody else, because the server checks the set against the live shares.
+4. `POST /files/{id}/keys/rotate { newKeyId, generation, wrappedKeys[], newHeadRef, nameEnc, metadataEnc, links }` with an `Idempotency-Key`, where `newHeadRef` is the staged head's content hash; the server makes the staged head the head and bumps `key_generation` in one transaction.
    `409 conflict` means another rotation won: abandon this attempt and refetch the new generation.
-   `409 version_conflict` means the head moved since staging: stage the new head again and retry.
-   `400` after a share changed means the member set no longer matches: re-read the shares, re-wrap and retry.
+   `409 version_conflict` means the head or the log moved since staging: stage the new head again and retry with the backoff settings of [13](13-sharing.md).
+   `400` after a share changed means the member set no longer matches: read the members again, re-wrap and retry.
 5. Peers see the `keyrotate` change in delta sync ([08](08-sync-engine.md)) and refetch their wrapped key.
 
 The server simultaneously drops the removed member's ACL grant (instant cutoff) even before rotation completes. Already-downloaded ciphertext cannot be un-seen (inherent). Rotation runs in the background via `KeyRotationWorker`; the file shows `Rotating` state ([04 §4.4](04-local-data-model.md)).
 
 Server contract since Phase 2.3 ([server 09 §9.6](https://github.com/Nyxite/NyxiteServer)):
-only the project owner's client rotates, because only the owner revokes other members, hands out keys and sees the member list.
-A grantee's client never rotates.
-It meets a rotation as `412 key_generation_stale` on its next write or as an unknown `keyId` on an update or the head, refetches `GET /files/{id}/keys`, which returns every generation it has, re-seals its pending outbox entries under the new key with their stable client ids and resubmits them, and shows `Rotating` until then.
+any remaining member with write access rotates (decided by the user on 2026-11-15), and a reader's client never does.
+The durable rotation task, the link choice and the retry settings are in [13](13-sharing.md).
+A member that did not rotate meets a rotation as `412 key_generation_stale` on its next write or as an unknown `keyId` on an update or the head, refetches `GET /files/{id}/keys`, which returns every generation it has, re-seals its pending outbox entries under the new key with their stable client ids and resubmits them, and shows `Rotating` until then.
 The `keyrotate` change of the delta feed reaches only the owner's devices, because shared-tree sync is not served yet.
 Old versions stay sealed with their old key and remain readable with the old wraps, so version history needs no re-encryption.
-A live link keeps the old key in its fragment and opens nothing written after the rotation, so after rotating the client offers to replace the file's links.
+The file's links are revoked with the rotation by default or kept frozen at the old generation, as the rotating account chooses ([13](13-sharing.md)).
 
 ## 7.7 Device loss / compromise
 

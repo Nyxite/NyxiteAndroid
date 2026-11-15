@@ -4,7 +4,7 @@ Full history of **encrypted, content-addressed snapshots**; **diffs and restore 
 
 ## 12.1 Listing
 
-- `GET /files/{id}/versions?cursor=&limit=` (newest first, paged until `nextCursor` is null) → version records: `seq`, `contentHash` (BLAKE3, opaque to server), `layout`, `sizeCipher`, `keyId`, `isHead`, `authorId?` (null = guest), `restoredFromSeq?`, `crdtSeq?` (text snapshots), `createdAt`. Cache as `FileVersionEntity` ([04](04-local-data-model.md)).
+- `GET /files/{id}/versions?cursor=&limit=` (newest first, paged until `nextCursor` is null) → version records: `seq`, `contentHash` (BLAKE3, opaque to server), `layout`, `sizeCipher`, `keyId`, `isHead`, `authorId?` (null = guest), `restoredFromSeq?`, `crdtSeq?` (text snapshots), `parentSeq`, `createdAt`. Cache as `FileVersionEntity` ([04](04-local-data-model.md)).
   The record has no blob address, because the ciphertext is fetched by `seq` ([§12.2](#122-fetch--decrypt-a-version)).
 - The history screen shows a timeline: timestamp, author (resolve `authorId` → display name; "guest" for null), and a size hint. No plaintext size or server summary exists.
   A version with `restoredFromSeq` is labelled "restored from version n", because the server links a recorded restore to the version that wrote it ([server 10 §10.5](https://github.com/Nyxite/NyxiteServer)).
@@ -42,6 +42,7 @@ The restore runs in this order, as the server contract of Phase 2.4 pins it ([se
 1. Fetch and verify version `seq` ([§12.2](#122-fetch--decrypt-a-version)), because a restore must not start from bytes that failed the check.
 2. `POST /files/{id}/restore { seq }` with an `Idempotency-Key` kept for retries of this restore.
    The server marks this account's next version of the file as `restoredFromSeq: seq`, and a version a collaborator writes in between does not take the mark.
+   The mark lapses when no version of this account follows within the server's `NYXITE__Limits__RestoreMarkLifetime`, 10 minutes by default, so the client writes the restored head right after recording it and records the restore again when the write was delayed beyond that.
 3. Write the new head through the normal write path, sealed with the file's current key.
    A version of an older generation is opened with its own wrap and sealed again, because the server refuses every write under an older key with `412 key_generation_stale`.
    For text, this device takes the snapshot after its restore update itself, because only this account's next version carries the link.
@@ -56,10 +57,12 @@ The restore action is not offered for a file excluded from sync, because the ser
 
 Because LWW losers are retained as versions ([08 §8.5](08-sync-engine.md)), the history screen is also where a user recovers a "lost" concurrent ink/binary edit: flag concurrent versions and offer "restore this one" / "keep both".
 
-The version record does not say that a version lost LWW, so the client flags it from what it saw arrive.
-A version is a kept loser when it came back as the `sibling` of a `409`, when the change feed delivered it with `isHead: false` ([08](08-sync-engine.md)), or when its `seq` is above the head's.
+Every version record carries `parentSeq`, the version its upload was based on, so the client flags kept losers from the history alone, a grantee's included (decided by the user on 2026-11-15).
+It replays the versions in ascending `seq` with the head starting at `0`: a version whose `parentSeq` equals the current head becomes the head, and any other is a kept loser.
+The change feed is no longer the signal, because it stays owner-scoped until shared-tree sync exists, so a grantee would never see an `isHead: false` entry.
+A version that came back as the `sibling` of a `409` is flagged at once, before the list is read again.
 The client stores the flag as `lwwLoser` ([04](04-local-data-model.md)).
-An older loser that a device only meets in the list, after later writes, looks like any earlier version, which stays open in the decision log of [`Nyxite`](https://github.com/Nyxite/Nyxite) (Phase 2.4 entry).
+A version written before the server recorded `parentSeq` carries `seq - 1`, which is right for every version that won.
 
 ## 12.6 Storage considerations
 

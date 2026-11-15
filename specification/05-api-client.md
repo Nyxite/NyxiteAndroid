@@ -50,8 +50,9 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 ### FileKeysApi
 - `GET /files/{id}/keys` *(caller's wrapped FK(s))*
 - `POST /files/{id}/keys` *(upload wrapped FK(s) for members)*
+- `GET /files/{id}/keys/rotate/members` *(write access only: `{ generation, rotationPending, members: [accountId] }`, the accounts a rotation wraps to, account ids only; a reader gets `403 acl_denied`)*
 - `PUT /files/{id}/keys/rotate/head` *(stage the head sealed with the new key; `Nyxite-Key-Id`, `Nyxite-Content-Hash`, and `Nyxite-Snapshot-Seq` or `If-Match`; `204`)*
-- `POST /files/{id}/keys/rotate` *(owner only: `{ newKeyId, generation, wrappedKeys[], newHeadRef, nameEnc, metadataEnc }` with `Idempotency-Key`, `newHeadRef` = content hash of the staged head; `409 conflict` lost, `409 version_conflict` head moved)*
+- `POST /files/{id}/keys/rotate` *(any account with write access: `{ newKeyId, generation, wrappedKeys[], newHeadRef, nameEnc, metadataEnc, links }` with `Idempotency-Key`, `newHeadRef` = content hash of the staged head, `links` = `revoke` (default) or `keep`; `409 conflict` lost to another rotation, `409 version_conflict` head or log moved)*
 - `POST /files/keys:batch` *(subtree share fan-out: `{ grants: [ { fileId | folderId, keyId, memberId, wrappedKey, algId? } ] }`, at most 500, idempotent, per-item `applied`/`rejected` in request order — see [13](13-sharing.md))*
 
 ### KeysDevicesRecoveryApi
@@ -63,7 +64,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET/PUT /recovery` *(server-opaque escrow blob + `kdf_params`)*
 
 ### VersionsApi
-- `GET /files/{id}/versions` *(`?cursor=&limit=`, newest first, `{ items, nextCursor }`)*
+- `GET /files/{id}/versions` *(`?cursor=&limit=`, newest first, `{ items, nextCursor }`, each record with `parentSeq`, the version it was based on)*
 - `GET /files/{id}/versions/{seq}` *(metadata)*
 - `GET /files/{id}/versions/{seq}/blob` *(ciphertext, with `ETag` = quoted `contentHash`, `Nyxite-Key-Id` and `Nyxite-Blob-Layout`)*
 - `POST /files/{id}/restore` *(body `{ seq }` only; new head derived from version `seq`, [12 §12.4](12-version-history.md))*
@@ -86,7 +87,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET/PUT /me/settings` *(settings body is **ciphertext**)*
 
 ### PublicShareApi (no bearer)
-- `GET /share/{token}` *(resolve link → JSON guest bootstrap with the guest token)*
+- `GET /share/{token}` *(resolve link → JSON guest bootstrap with the guest token; `file.frozen: true` for a link a key rotation kept, which serves its frozen head read only and has no relay room, `409 link_frozen`)*
 - `POST /share/{token}/session` *(renew the 15-min guest token)*
 - `GET /share/{token}/blob` *(ciphertext, guest token as bearer)*
 - `POST /share/{token}/socket-ticket` *(single-use 60 s ticket, guest token as bearer)*

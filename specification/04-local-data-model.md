@@ -60,15 +60,20 @@ Indexes: `projectId`, `folderId`, `ownerId`, `syncState`, `keepOnDevice`, `(keep
 - **Indices**: unique `(fileId, keyId, memberId)` scoped to `memberId IS NOT NULL`, and unique `(fileId, keyId, shareId)` scoped to `shareId IS NOT NULL`.
 
 ### FileVersionEntity
-`id` PK (local), `fileId`, `seq`, `contentHash` BLOB, `layout` (`single`/`chunked`), `sizeCipher`, `keyId`, `isHead` BOOL, `authorId?`, `restoredFromSeq?`, `crdtSeq?` (text snapshots), `createdAt`, `lwwLoser` BOOL (local). Unique `(fileId, seq)`. Index `(fileId, seq DESC)`.
+`id` PK (local), `fileId`, `seq`, `contentHash` BLOB, `layout` (`single`/`chunked`), `sizeCipher`, `keyId`, `isHead` BOOL, `authorId?`, `restoredFromSeq?`, `crdtSeq?` (text snapshots), `parentSeq`, `createdAt`, `lwwLoser` BOOL (local). Unique `(fileId, seq)`. Index `(fileId, seq DESC)`.
 The columns mirror the server's version record, which carries no blob address, because the ciphertext is fetched by `seq` ([12 §12.1](12-version-history.md)).
-`lwwLoser` is set locally when a version arrives as the `sibling` of a `409` or with `isHead: false` in the change feed, because the record itself does not say that a version lost LWW ([12 §12.5](12-version-history.md)).
+`lwwLoser` is derived locally from `parentSeq` by replaying the versions in `seq` order, and set at once for the `sibling` of a `409` ([12 §12.5](12-version-history.md)).
 
 ### CrdtUpdateEntity (local log mirror / outbox)
 `id` autogen, `crdtDocId`, `seq?` (null until server-assigned for outgoing), `updateEnc` BLOB, `keyId`, `authorId?`, `createdAt`, `direction` (`inbound`/`outbound`), `acked` BOOL. Backs offline catch-up and the submit outbox ([09](09-realtime-collaboration.md)).
 
 ### ShareEntity
-`id` PK, target (`fileId?`/`folderId?`/`projectId?`), `kind` (`user_grant`/`link`), `granteeId?`, `linkTokenHash?` BLOB, `permission` (`read`/`write`), `createdBy`, `createdAt`, `expiresAt?`, `revokedAt?`. The **link token + fragment key are never stored** server-side; locally the app may keep a created link (token + fragment) only if the user chose to, in encrypted prefs, clearly marked.
+`id` PK, target (`fileId?`/`folderId?`/`projectId?`), `kind` (`user_grant`/`link`), `granteeId?`, `linkTokenHash?` BLOB, `permission` (`read`/`write`), `createdBy`, `createdAt`, `expiresAt?`, `revokedAt?`, `frozenGeneration?` (a link a key rotation kept, [13](13-sharing.md)). The **link token + fragment key are never stored** server-side; locally the app may keep a created link (token + fragment) only if the user chose to, in encrypted prefs, clearly marked.
+
+### RotationTaskEntity (durable pending key rotation)
+`fileId` PK, `createdAtGeneration` (the file's `keyGeneration` when the task was created), `origin` (`ownerRevoke`, `serverMark`, `expiredShare`), `linkChoice?` (`revoke`/`keep`, null = default `revoke`), `attempts`, `nextAttemptAt`, `pausedUntil?`, `lastError?`, `createdAt`.
+The task survives restarts and process death, so a revocation is completed by whichever eligible device comes online first, and it is deleted once the file's generation moved past `createdAtGeneration` or the server reports `rotationPending: false` ([13](13-sharing.md)).
+It holds no key and no member list, because both are fetched fresh when the rotation runs.
 
 ### DeviceEntity
 `id` PK, `label`, `pubkey` BLOB, `enrolledAt`, `revokedAt?`, `isThisDevice` BOOL.
