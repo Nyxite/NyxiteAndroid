@@ -12,6 +12,27 @@ Two-layer model ([server 09](https://github.com/Nyxite/NyxiteServer)): a **serve
 
 The server stores only the opaque wrapped blob; it never sees the FK.
 
+### Server contract pinned in Phase 2.2
+
+The server side of sharing is built, and these points of its contract were pinned with it ([server 09 §9.4a](https://github.com/Nyxite/NyxiteServer), [server 04 §4.8](https://github.com/Nyxite/NyxiteServer)).
+The fixtures `sharing.json` of P2.2-CORE-1 hold one request and response of each, and no request in them carries the fragment.
+
+- Wraps to a member use HPKE with `info = "nyxite object key v1"` and `aad = object_id(16) ‖ key_id(16)`, because the AAD binds a wrap to its object and key generation and the recipient's client must open what any other client sealed.
+- An account share carries the target's own key in `POST /shares` `wrappedKeys`, the current generation at least.
+  The subtree fan-out `POST /files/keys:batch` takes folder keys as well as file keys, each grant with exactly one of `fileId` and `folderId`, because every folder has its own key.
+  A grant is `applied` also when it was stored before, so the resumable queue is drained without an `Idempotency-Key`.
+- The project owner shares, changes shares and hands out keys.
+  A grantee removes its own share with `DELETE /shares/{id}`, and a write share covers content only, so a grantee's rename, move, create or delete answers `403 acl_denied`.
+- `GET /shares` without a target lists the live account shares granted to the caller, the "shared with me" view.
+- A link targets one file, because its fragment carries one file key.
+  The token is 32 random bytes as 43 base64url characters, and `linkTokenHash` is the SHA-256 of its ASCII characters.
+- `GET /share/{token}` answers JSON with the file's ciphertext name, the current `keyId` the fragment key must match, and a guest token.
+  `POST /share/{token}/session` renews the guest token, `GET /share/{token}/blob` and `POST /share/{token}/socket-ticket` need it as bearer.
+  The guest relay `/share/{token}/ws` is WebSockets only and takes a single-use ticket per connection.
+- An unknown token is `404`, a revoked or expired one `410 share_revoked` or `410 link_expired`, and an open guest connection is closed with that code by the relay's re-check.
+  Every `/share/{token}*` request counts against 30 per minute per IP, `POST /shares` against 30 per minute per user, and the client backs off on `429` by `Retry-After`.
+- `POST /files/{id}/keys/rotate` is Phase 2.3, so its fixture is pinned and the endpoint is not served yet.
+
 ## 13.2 Link share (anonymous / guest)
 
 1. The client mints a high-entropy link **token** (≥128-bit) and uses the FK as the **fragment key** (≥256-bit).

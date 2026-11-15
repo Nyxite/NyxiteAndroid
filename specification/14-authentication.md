@@ -43,6 +43,7 @@ Until the identity key is present, the app can show structure (encrypted names w
 ## 14.5 Share-token sessions (guests)
 
 For link shares, the app obtains a **short-lived, relay-scoped share session token** from `GET /share/{token}` (no account login) to authorize relay/ciphertext access; the decryption key is the URL fragment ([13 §13.3](13-sharing.md),[09 §9.8](09-realtime-collaboration.md)). **Lifetimes** (match server): the guest **share-session token is 15 min, renewable**; the **relay socket ticket is single-use, 60 s**. Guest sessions are bounded by token lifetime + share validity and run without the full key/device subsystem.
+The guest token is a JWT of `typ: nyx-guest+jwt` with `sub = "share:{shareId}"`, `share_id` and `perm`, accepted only on the paths of its own link, and `POST /share/{token}/session` renews it while the share is live ([server 08 §8.2](https://github.com/Nyxite/NyxiteServer)).
 
 **Guest storage model**: a guest session runs **without the per-account SQLCipher DB**. Guest content is held in an **ephemeral in-memory cache only** and is **never written to any account database or `noBackup` files**; decrypted views are transient and discarded when the session ends ([09 §9.8](09-realtime-collaboration.md)).
 

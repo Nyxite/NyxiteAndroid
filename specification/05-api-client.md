@@ -51,7 +51,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET /files/{id}/keys` *(caller's wrapped FK(s))*
 - `POST /files/{id}/keys` *(upload wrapped FK(s) for members)*
 - `POST /files/{id}/keys/rotate` *(register new generation: re-wrapped keys + new head ciphertext ref)*
-- `POST /files/keys:batch` *(subtree share fan-out: `{ grants: [ { fileId, keyId, memberId, wrappedKey } ] }`; idempotent, per-item partial success — see [13](13-sharing.md))*
+- `POST /files/keys:batch` *(subtree share fan-out: `{ grants: [ { fileId | folderId, keyId, memberId, wrappedKey, algId? } ] }`, at most 500, idempotent, per-item `applied`/`rejected` in request order — see [13](13-sharing.md))*
 
 ### KeysDevicesRecoveryApi
 - `GET /keys/directory?userId=` | `?email=` *(public keys)*
@@ -68,7 +68,7 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `POST /files/{id}/restore` *(body `{ seq }` only; new head derived from version `seq`, [12 §12.4](12-version-history.md))*
 
 ### SharesApi
-- `GET /shares?targetType={file|folder|project}&targetId={id}`
+- `GET /shares?targetType={file|folder|project}&targetId={id}` *(owner only)* and `GET /shares` without a target *(account shares granted to the caller)*
 - `POST /shares { targetType, targetId, kind, ... }` *(account: wrapped keys; link: `linkTokenHash` only)*
 - `PATCH /shares/{id}` *(permission/expiry)*
 - `DELETE /shares/{id}` *(revoke; client rotates key separately)*
@@ -82,9 +82,11 @@ Grouped to match the server resource map. Bodies marked *(ciphertext)* are opaqu
 - `GET/PUT /me/settings` *(settings body is **ciphertext**)*
 
 ### PublicShareApi (no bearer)
-- `GET /share/{token}` *(resolve link → guest bootstrap)*
-- `GET /share/{token}/blob` *(ciphertext)*
-- relay WS at `/share/{token}/ws` (handled by `RelayClient`, [09](09-realtime-collaboration.md))
+- `GET /share/{token}` *(resolve link → JSON guest bootstrap with the guest token)*
+- `POST /share/{token}/session` *(renew the 15-min guest token)*
+- `GET /share/{token}/blob` *(ciphertext, guest token as bearer)*
+- `POST /share/{token}/socket-ticket` *(single-use 60 s ticket, guest token as bearer)*
+- relay WS at `/share/{token}/ws`, WebSockets only (handled by `RelayClient`, [09](09-realtime-collaboration.md))
 
 > The client implements **no** `/search`, `/diff`, `/content` (decoded), or `/crdt/state` calls — none exist. Search and diff are local ([11](11-search.md),[12](12-version-history.md)).
 
